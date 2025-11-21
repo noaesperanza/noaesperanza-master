@@ -201,28 +201,6 @@ const Landing: React.FC = () => {
     }
   }
 
-  const handleAdminLogin = async () => {
-    if (!adminLoginData.email || !adminLoginData.password) {
-      error('Preencha todos os campos')
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      await login(adminLoginData.email, adminLoginData.password)
-      success('Login admin realizado com sucesso!')
-      setAdminLoginData({ email: '', password: '' })
-      setShowAdminLogin(false)
-      
-      // O redirecionamento será feito pelo useEffect quando o user for carregado
-      console.log('✅ Login realizado, aguardando carregamento do perfil...')
-    } catch (err) {
-      error('Erro no login admin. Verifique suas credenciais.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const profiles = [
     {
       id: 'profissional',
