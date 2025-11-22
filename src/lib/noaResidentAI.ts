@@ -320,23 +320,13 @@ Sempre seja empática, profissional e focada na saúde do paciente.`,
           const activeClinics = dashboard.activeClinics ?? platformData?.activeClinics ?? 0
 
           return this.createResponse(
-            `Dr. Ricardo, aqui estão as informações administrativas da plataforma MedCannLab 3.0:\n\n` +
-            `👑 **Visão Administrativa Completa:**\n` +
-            `• Status do Sistema: Online (99.9%)\n` +
-            `• Usuários Ativos: 1,234\n` +
-            `• Avaliações Hoje: 156\n` +
-            `• Consultórios Conectados: ${activeClinics}\n\n` +
-            `📊 **KPIs Administrativos:**\n` +
+            `Dr. Ricardo, sua visão administrativa da MedCannLab 3.0 está carregada.\n\n` +
+            `📊 **Resumo rápido dos KPIs:**\n` +
             `• Total de Pacientes: ${totalPatients}\n` +
             `• Protocolos AEC: ${aecProtocols}\n` +
             `• Avaliações Completas: ${completedAssessments}\n` +
-            `• Rede Integrada: ATIVA\n\n` +
-            `🏥 **Sistema Integrado:**\n` +
-            `• Cidade Amiga dos Rins: OPERACIONAL\n` +
-            `• Cannabis Medicinal: FUNCIONANDO\n` +
-            `• Espinha Dorsal AEC: ATIVA\n` +
-            `• IA Resident: CONECTADA\n\n` +
-            `Como posso ajudá-lo com a gestão administrativa?`,
+            `• Consultórios Conectados: ${activeClinics}\n\n` +
+            `Em que parte da gestão você quer focar agora? (ex.: pacientes, relatórios, agendamentos, pesquisa)`,
             0.9
           )
         } else {
@@ -371,48 +361,27 @@ Sempre seja empática, profissional e focada na saúde do paciente.`,
           const activeClinics = platformData?.activeClinics ?? dashboard.activeClinics ?? 3
 
           return this.createResponse(
-            `Dr. Ricardo, aqui estão os dados administrativos da plataforma MedCannLab 3.0:\n\n` +
-            `📊 **Status Administrativo:**\n` +
+            `Dr. Ricardo, aqui vai um recorte objetivo da camada administrativa:\n\n` +
+            `📊 **Números principais:**\n` +
             `• Total de Pacientes: ${totalPatients}\n` +
             `• Avaliações Completas: ${completedAssessments}\n` +
             `• Protocolos AEC: ${aecProtocols}\n` +
             `• Consultórios Ativos: ${activeClinics}\n\n` +
-            `🏥 **Sistema Integrado:**\n` +
-            `• Cidade Amiga dos Rins: ATIVO\n` +
-            `• Cannabis Medicinal: OPERACIONAL\n` +
-            `• Espinha Dorsal AEC: FUNCIONANDO\n` +
-            `• Rede de Consultórios: CONECTADA\n\n` +
-            `👑 **Visão Administrativa:**\n` +
-            `• Acesso completo ao sistema\n` +
-            `• Monitoramento das 3 camadas\n` +
-            `• Gestão de usuários e permissões\n` +
-            `• Supervisão de todos os consultórios\n\n` +
-            `✅ **Status da Integração:**\n` +
-            `• Conexão IA-Plataforma: ATIVA\n` +
-            `• Dados em tempo real: FUNCIONANDO\n` +
-            `• Última atualização: ${new Date().toLocaleString('pt-BR')}\n\n` +
-            `Como posso ajudá-lo com a gestão administrativa da plataforma?`,
+            `Qual recorte você quer explorar em mais detalhes agora? (ex.: só hoje, apenas pendentes, por clínica)`,
             0.95
           )
         } else {
           return this.createResponse(
-            `${userTitle}, aqui estão os dados específicos da sua área de atendimento:\n\n` +
-            `📅 **Agendamentos para Hoje:**\n` +
-            `• 09:00 - Maria Santos (Consulta de retorno) - Confirmado\n` +
-            `• 14:00 - João Silva (Avaliação inicial) - Confirmado\n` +
-            `• 16:30 - Ana Costa (Consulta de emergência) - Pendente\n\n` +
-            `📋 **Relatórios Pendentes:**\n` +
-            `• Maria Santos - Avaliação clínica inicial (Compartilhado) - NFT: NFT-123456\n` +
-            `• João Silva - Relatório de acompanhamento (Rascunho)\n\n` +
-            `🔔 **Notificações Ativas:**\n` +
-            `• Relatório compartilhado por Maria Santos\n` +
-            `• Prescrição de CBD para João Silva aprovada\n` +
-            `• Agendamento com Ana Costa confirmado\n\n` +
-            `✅ **Status da Integração:**\n` +
-            `• Conexão IA-Plataforma: ATIVA\n` +
-            `• Dados em tempo real: FUNCIONANDO\n` +
-            `• Última atualização: ${new Date().toLocaleString('pt-BR')}\n\n` +
-            `Como posso ajudá-lo com algum desses dados específicos?`,
+            `${userTitle}, vou resumir o que importa hoje na sua área de atendimento:\n\n` +
+            `📅 **Agenda de hoje (exemplo simulado):**\n` +
+            `• 09:00 - Maria Santos (retorno)\n` +
+            `• 14:00 - João Silva (avaliação inicial)\n` +
+            `• 16:30 - Ana Costa (emergência)\n\n` +
+            `📋 **Tarefas clínicas sugeridas:**\n` +
+            `• Finalizar relatórios pendentes\n` +
+            `• Revisar prescrições recentes\n` +
+            `• Checar agendamentos da próxima semana\n\n` +
+            `Sobre qual desses pontos você quer que eu aprofunde primeiro?`,
             0.95
           )
         }
