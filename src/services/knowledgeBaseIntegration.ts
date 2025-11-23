@@ -147,20 +147,21 @@ export class KnowledgeBaseIntegration {
       const searchConditions: string[] = []
       
       // Busca exata no título (para nomes de arquivo)
+      // PostgREST usa * para wildcards, não %
       if (searchTerm.length > 0) {
-        searchConditions.push(`title.ilike.%${searchTerm}%`)
-        searchConditions.push(`summary.ilike.%${searchTerm}%`)
+        searchConditions.push(`title.ilike.*${searchTerm}*`)
+        searchConditions.push(`summary.ilike.*${searchTerm}*`)
         
         // Se houver extensão de arquivo, buscar também
         if (searchTerm.includes('.')) {
-          searchConditions.push(`title.ilike.%${searchTerm.replace(/\./g, '%.')}%`)
+          searchConditions.push(`title.ilike.*${searchTerm.replace(/\./g, '*.')}*`)
         }
       }
       
       // Busca por palavras individuais (para melhor matching)
       searchTerms.forEach(term => {
-        searchConditions.push(`title.ilike.%${term}%`)
-        searchConditions.push(`summary.ilike.%${term}%`)
+        searchConditions.push(`title.ilike.*${term}*`)
+        searchConditions.push(`summary.ilike.*${term}*`)
       })
       
       if (searchConditions.length > 0) {

@@ -220,9 +220,11 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       if (handle.timer) {
         window.clearTimeout(handle.timer)
       }
+      // Aumentar tempo de espera para 2.5 segundos após silêncio
+      // Isso dá tempo para o usuário pensar e continuar falando
       handle.timer = window.setTimeout(() => {
         flush()
-      }, 900)
+      }, 2500) // 2.5 segundos de silêncio antes de enviar
     }
 
     recognition.onresult = (event: any) => {
@@ -351,13 +353,28 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
     }
 
     if (!isOpen) return
-    if (isProcessing || isSpeaking) return
+    if (isProcessing || isSpeaking) {
+      console.log('⏸️ Auto-resume pausado:', { isProcessing, isSpeaking })
+      return
+    }
     if (isRecordingConsultation || showPatientSelector) return
     if (isListening || isListeningRef.current) return
     if (autoResumeRequestedRef.current) return
 
-    autoResumeRequestedRef.current = true
-    startListening()
+    // Aguardar um pouco mais após a síntese terminar antes de iniciar reconhecimento
+    // Isso evita que o reconhecimento interfira com a síntese
+    const delay = isSpeaking ? 1000 : 500 // 1 segundo se estava falando, 500ms caso contrário
+    
+    const timeoutId = setTimeout(() => {
+      // Verificar novamente antes de iniciar
+      if (!isProcessing && !isSpeaking && !isListening && !isListeningRef.current) {
+        autoResumeRequestedRef.current = true
+        console.log('🎤 Iniciando auto-resume após delay')
+        startListening()
+      }
+    }, delay)
+
+    return () => clearTimeout(timeoutId)
   }, [
     shouldAutoResume,
     isOpen,

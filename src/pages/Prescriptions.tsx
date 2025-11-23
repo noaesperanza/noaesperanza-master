@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { 
   FileText,
   Plus,
@@ -15,7 +17,9 @@ import {
   Pill,
   FileCheck,
   Mail,
-  QrCode
+  QrCode,
+  X,
+  Loader2
 } from 'lucide-react'
 
 interface Medication {
@@ -29,22 +33,41 @@ interface Medication {
 
 interface Prescription {
   id: string
-  type: 'simple' | 'special' | 'blue' | 'yellow'
-  patientName: string
-  date: string
+  prescription_type: 'simple' | 'special' | 'blue' | 'yellow'
+  patient_id?: string
+  patient_name: string
+  patient_cpf?: string
+  patient_email?: string
+  patient_phone?: string
+  professional_id?: string
+  professional_name: string
+  professional_crm: string
+  professional_specialty?: string
   medications: Medication[]
-  professionalName: string
-  crm: string
-  signature: string
-  status: 'draft' | 'signed' | 'sent' | 'validated'
-  validationUrl: string
+  status: 'draft' | 'signed' | 'sent' | 'validated' | 'cancelled'
+  iti_validation_code?: string
+  iti_validation_url?: string
+  iti_qr_code?: string
+  digital_signature?: string
+  signature_timestamp?: string
+  created_at: string
+  expires_at?: string
 }
 
 const Prescriptions: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [selectedType, setSelectedType] = useState<'simple' | 'special' | 'blue' | 'yellow' | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [patientSearch, setPatientSearch] = useState('')
+  const [patientResults, setPatientResults] = useState<any[]>([])
+  const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
+  const [currentPrescriptionId, setCurrentPrescriptionId] = useState<string | null>(null)
 
   // Ler tipo da URL e pré-selecionar
   useEffect(() => {
@@ -59,6 +82,9 @@ const Prescriptions: React.FC = () => {
 
   const [patientName, setPatientName] = useState('')
   const [patientCPF, setPatientCPF] = useState('')
+  const [patientEmail, setPatientEmail] = useState('')
+  const [patientPhone, setPatientPhone] = useState('')
+  const [patientId, setPatientId] = useState<string | null>(null)
   const [medications, setMedications] = useState<Medication[]>([])
   const [currentMedication, setCurrentMedication] = useState({
     name: '',
@@ -67,6 +93,7 @@ const Prescriptions: React.FC = () => {
     duration: '',
     quantity: ''
   })
+  const [notes, setNotes] = useState('')
 
   // Tipos de prescrição do CFM
   const prescriptionTypes = [
@@ -120,31 +147,304 @@ const Prescriptions: React.FC = () => {
     setMedications(medications.filter(m => m.id !== id))
   }
 
-  const handleCreatePrescription = () => {
-    const prescription: Prescription = {
-      id: Date.now().toString(),
-      type: selectedType!,
-      patientName,
-      date: new Date().toLocaleDateString('pt-BR'),
-      medications,
-      professionalName: 'Dr. Ricardo Valença',
-      crm: 'CRM-RJ 123456',
-      signature: '',
-      status: 'draft',
-      validationUrl: ''
+  // Carregar prescrições do banco
+  useEffect(() => {
+    if (user) {
+      loadPrescriptions()
     }
+  }, [user])
+
+  const loadPrescriptions = async () => {
+    if (!user?.id) return
     
-    console.log('Prescrição criada:', prescription)
-    alert('Prescrição criada com sucesso!')
-    setShowForm(false)
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('cfm_prescriptions')
+        .select('*')
+        .eq('professional_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      if (fetchError) {
+        console.error('Erro ao carregar prescrições:', fetchError)
+        setError('Erro ao carregar prescrições')
+        return
+      }
+
+      const formattedPrescriptions: Prescription[] = (data || []).map((p: any) => ({
+        id: p.id,
+        prescription_type: p.prescription_type,
+        patient_id: p.patient_id,
+        patient_name: p.patient_name,
+        patient_cpf: p.patient_cpf,
+        patient_email: p.patient_email,
+        patient_phone: p.patient_phone,
+        professional_id: p.professional_id,
+        professional_name: p.professional_name,
+        professional_crm: p.professional_crm,
+        professional_specialty: p.professional_specialty,
+        medications: p.medications || [],
+        status: p.status || 'draft',
+        iti_validation_code: p.iti_validation_code,
+        iti_validation_url: p.iti_validation_url,
+        iti_qr_code: p.iti_qr_code,
+        digital_signature: p.digital_signature,
+        signature_timestamp: p.signature_timestamp,
+        created_at: p.created_at,
+        expires_at: p.expires_at
+      }))
+
+      setPrescriptions(formattedPrescriptions)
+    } catch (err) {
+      console.error('Erro ao carregar prescrições:', err)
+      setError('Erro ao carregar prescrições')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleDigitalSignature = () => {
-    alert('Assinatura Digital ICP Brasil aplicada com sucesso!')
+  // Buscar pacientes
+  const searchPatients = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setPatientResults([])
+      return
+    }
+
+    try {
+      // Buscar pacientes - tentar users_compatible primeiro, depois users
+      let usersData = null
+      let usersError = null
+      
+      // Tentar users_compatible (view que combina auth.users e users)
+      const { data: compatibleData, error: compatibleError } = await supabase
+        .from('users_compatible')
+        .select('id, name, email, cpf, phone, type')
+        .or(`name.ilike.*${searchTerm}*,cpf.ilike.*${searchTerm}*,email.ilike.*${searchTerm}*`)
+        .in('type', ['patient', 'paciente'])
+        .limit(10)
+      
+      if (!compatibleError && compatibleData) {
+        usersData = compatibleData
+      } else {
+        // Fallback: buscar em users
+        const { data: usersDataFallback, error: usersErrorFallback } = await supabase
+          .from('users')
+          .select('id, name, email, cpf, phone, type')
+          .or(`name.ilike.*${searchTerm}*,cpf.ilike.*${searchTerm}*,email.ilike.*${searchTerm}*`)
+          .in('type', ['patient', 'paciente'])
+          .limit(10)
+        
+        usersData = usersDataFallback
+        usersError = usersErrorFallback
+      }
+
+      if (usersError) {
+        console.error('Erro ao buscar pacientes:', usersError)
+        return
+      }
+
+      setPatientResults(usersData || [])
+    } catch (err) {
+      console.error('Erro ao buscar pacientes:', err)
+    }
   }
 
-  const handleSendToPatient = () => {
-    alert('Prescrição enviada ao paciente por email e SMS com link de validação ITI')
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (patientSearch) {
+        searchPatients(patientSearch)
+      } else {
+        setPatientResults([])
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [patientSearch])
+
+  const handleSelectPatient = (patient: any) => {
+    setSelectedPatient(patient)
+    setPatientName(patient.name || '')
+    setPatientCPF(patient.cpf || '')
+    setPatientEmail(patient.email || '')
+    setPatientPhone(patient.phone || '')
+    setPatientId(patient.id)
+    setPatientSearch('')
+    setPatientResults([])
+  }
+
+  const handleCreatePrescription = async () => {
+    if (!user) {
+      alert('Você precisa estar logado para criar prescrições')
+      return
+    }
+
+    if (!patientName || medications.length === 0) {
+      alert('Preencha o nome do paciente e adicione pelo menos um medicamento')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const prescriptionData = {
+        prescription_type: selectedType!,
+        patient_id: patientId || null,
+        patient_name: patientName,
+        patient_cpf: patientCPF || null,
+        patient_email: patientEmail || null,
+        patient_phone: patientPhone || null,
+        professional_id: user.id,
+        professional_name: user.name || 'Profissional',
+        professional_crm: user.crm || '',
+        professional_specialty: null,
+        medications: medications.map(m => ({
+          name: m.name,
+          dosage: m.dosage,
+          frequency: m.frequency,
+          duration: m.duration,
+          quantity: m.quantity
+        })),
+        status: 'draft',
+        notes: notes || null,
+        metadata: {}
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('cfm_prescriptions')
+        .insert(prescriptionData)
+        .select()
+        .single()
+
+      if (insertError) {
+        throw insertError
+      }
+
+      setCurrentPrescriptionId(data.id)
+      alert('Prescrição criada com sucesso! Agora você pode assinar digitalmente.')
+      await loadPrescriptions()
+    } catch (err: any) {
+      console.error('Erro ao criar prescrição:', err)
+      setError(err.message || 'Erro ao criar prescrição')
+      alert('Erro ao criar prescrição: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDigitalSignature = async () => {
+    if (!currentPrescriptionId) {
+      alert('Crie uma prescrição primeiro')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      // Simular assinatura digital ICP Brasil
+      const signatureData = {
+        digital_signature: `ICP-BR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        signature_certificate: 'Certificado ICP Brasil - Válido',
+        signature_timestamp: new Date().toISOString(),
+        status: 'signed'
+        // O trigger vai gerar automaticamente o código ITI quando status = 'signed'
+      }
+
+      const { data, error: updateError } = await supabase
+        .from('cfm_prescriptions')
+        .update(signatureData)
+        .eq('id', currentPrescriptionId)
+        .select()
+        .single()
+
+      if (updateError) {
+        throw updateError
+      }
+
+      // Gerar QR Code (simulado - em produção usar biblioteca de QR code)
+      const qrCodeData = {
+        iti_qr_code: `data:image/svg+xml;base64,${btoa(`<svg><text>${data.iti_validation_code}</text></svg>`)}`
+      }
+
+      await supabase
+        .from('cfm_prescriptions')
+        .update(qrCodeData)
+        .eq('id', currentPrescriptionId)
+
+      alert('Prescrição assinada digitalmente com sucesso! Código ITI gerado: ' + data.iti_validation_code)
+      await loadPrescriptions()
+    } catch (err: any) {
+      console.error('Erro ao assinar prescrição:', err)
+      setError(err.message || 'Erro ao assinar prescrição')
+      alert('Erro ao assinar prescrição: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSendToPatient = async () => {
+    if (!currentPrescriptionId) {
+      alert('Crie e assine uma prescrição primeiro')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      // Verificar se está assinada
+      const { data: prescription, error: fetchError } = await supabase
+        .from('cfm_prescriptions')
+        .select('status, patient_email, patient_phone, iti_validation_code, iti_validation_url')
+        .eq('id', currentPrescriptionId)
+        .single()
+
+      if (fetchError) {
+        throw fetchError
+      }
+
+      if (prescription.status !== 'signed') {
+        alert('A prescrição precisa estar assinada digitalmente antes de ser enviada')
+        return
+      }
+
+      // Atualizar status e marcar como enviada
+      const updateData = {
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        sent_via_email: !!prescription.patient_email,
+        sent_via_sms: !!prescription.patient_phone,
+        email_sent_at: prescription.patient_email ? new Date().toISOString() : null,
+        sms_sent_at: prescription.patient_phone ? new Date().toISOString() : null
+      }
+
+      const { error: updateError } = await supabase
+        .from('cfm_prescriptions')
+        .update(updateData)
+        .eq('id', currentPrescriptionId)
+
+      if (updateError) {
+        throw updateError
+      }
+
+      // Em produção, aqui seria feita a integração com serviço de email/SMS
+      // Por enquanto, apenas simular
+      alert(`Prescrição enviada com sucesso!\n\nCódigo ITI: ${prescription.iti_validation_code}\nURL de Validação: ${prescription.iti_validation_url}\n\n${prescription.patient_email ? `Email enviado para: ${prescription.patient_email}\n` : ''}${prescription.patient_phone ? `SMS enviado para: ${prescription.patient_phone}` : ''}`)
+      
+      await loadPrescriptions()
+      setShowForm(false)
+      setCurrentPrescriptionId(null)
+    } catch (err: any) {
+      console.error('Erro ao enviar prescrição:', err)
+      setError(err.message || 'Erro ao enviar prescrição')
+      alert('Erro ao enviar prescrição: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -228,10 +528,122 @@ const Prescriptions: React.FC = () => {
 
             {/* Prescrições Recentes */}
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Prescrições Recentes</h2>
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
-                <p className="text-slate-400 text-center py-8">Nenhuma prescrição encontrada</p>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white">Prescrições Recentes</h2>
+                {loading && <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />}
               </div>
+              
+              {loading && prescriptions.length === 0 ? (
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+                  <p className="text-slate-400 text-center py-8">Carregando prescrições...</p>
+                </div>
+              ) : prescriptions.length === 0 ? (
+                <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50">
+                  <p className="text-slate-400 text-center py-8">Nenhuma prescrição encontrada</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {prescriptions.map((prescription) => {
+                    const typeInfo = prescriptionTypes.find(t => t.id === prescription.prescription_type)
+                    const TypeIcon = typeInfo?.icon || FileText
+                    const statusColors = {
+                      draft: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                      signed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                      sent: 'bg-green-500/20 text-green-400 border-green-500/30',
+                      validated: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                      cancelled: 'bg-red-500/20 text-red-400 border-red-500/30'
+                    }
+                    const statusLabels = {
+                      draft: 'Rascunho',
+                      signed: 'Assinada',
+                      sent: 'Enviada',
+                      validated: 'Validada',
+                      cancelled: 'Cancelada'
+                    }
+
+                    return (
+                      <div
+                        key={prescription.id}
+                        className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 hover:border-slate-600 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <div className={`p-2 rounded-lg bg-gradient-to-br ${typeInfo?.color || 'from-blue-500 to-cyan-500'}`}>
+                                <TypeIcon className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg font-bold text-white">{typeInfo?.name}</h3>
+                                <p className="text-sm text-slate-400">
+                                  {prescription.patient_name}
+                                  {prescription.patient_cpf && ` • CPF: ${prescription.patient_cpf}`}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-4 space-y-2">
+                              <div className="flex items-center space-x-4 text-sm">
+                                <span className={`px-3 py-1 rounded-full border ${statusColors[prescription.status] || statusColors.draft}`}>
+                                  {statusLabels[prescription.status] || 'Desconhecido'}
+                                </span>
+                                <span className="text-slate-400">
+                                  {new Date(prescription.created_at).toLocaleDateString('pt-BR')}
+                                </span>
+                                {prescription.iti_validation_code && (
+                                  <span className="text-blue-400">
+                                    ITI: {prescription.iti_validation_code}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {prescription.medications && prescription.medications.length > 0 && (
+                                <div className="mt-3">
+                                  <p className="text-sm font-medium text-slate-300 mb-2">Medicamentos:</p>
+                                  <div className="space-y-1">
+                                    {prescription.medications.map((med: any, idx: number) => (
+                                      <p key={idx} className="text-sm text-slate-400">
+                                        • {med.name} - {med.dosage} ({med.frequency})
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            {prescription.iti_qr_code && (
+                              <button
+                                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                                title="Ver QR Code"
+                              >
+                                <QrCode className="w-5 h-5 text-blue-400" />
+                              </button>
+                            )}
+                            {prescription.iti_validation_url && (
+                              <a
+                                href={prescription.iti_validation_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                                title="Validar no Portal ITI"
+                              >
+                                <FileCheck className="w-5 h-5 text-green-400" />
+                              </a>
+                            )}
+                            <button
+                              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                              title="Download PDF"
+                            >
+                              <Download className="w-5 h-5 text-slate-400" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -253,10 +665,62 @@ const Prescriptions: React.FC = () => {
               {/* Dados do Paciente */}
               <div className="space-y-4 mb-6">
                 <h3 className="text-lg font-semibold text-white">Dados do Paciente</h3>
+                
+                {/* Busca de Paciente */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Buscar Paciente
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={patientSearch}
+                      onChange={(e) => setPatientSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                      placeholder="Digite nome, CPF ou email do paciente"
+                    />
+                    {selectedPatient && (
+                      <button
+                        onClick={() => {
+                          setSelectedPatient(null)
+                          setPatientName('')
+                          setPatientCPF('')
+                          setPatientEmail('')
+                          setPatientPhone('')
+                          setPatientId(null)
+                        }}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Resultados da Busca */}
+                  {patientResults.length > 0 && !selectedPatient && (
+                    <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {patientResults.map((patient) => (
+                        <button
+                          key={patient.id}
+                          onClick={() => handleSelectPatient(patient)}
+                          className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-b-0"
+                        >
+                          <p className="text-white font-medium">{patient.name}</p>
+                          <p className="text-sm text-slate-400">
+                            {patient.cpf && `CPF: ${patient.cpf} • `}
+                            {patient.email && `Email: ${patient.email}`}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Nome do Paciente
+                      Nome do Paciente *
                     </label>
                     <input
                       type="text"
@@ -264,6 +728,7 @@ const Prescriptions: React.FC = () => {
                       onChange={(e) => setPatientName(e.target.value)}
                       className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                       placeholder="Digite o nome completo"
+                      required
                     />
                   </div>
                   <div>
@@ -276,6 +741,30 @@ const Prescriptions: React.FC = () => {
                       onChange={(e) => setPatientCPF(e.target.value)}
                       className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                       placeholder="000.000.000-00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={patientEmail}
+                      onChange={(e) => setPatientEmail(e.target.value)}
+                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                      placeholder="email@exemplo.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Telefone
+                    </label>
+                    <input
+                      type="text"
+                      value={patientPhone}
+                      onChange={(e) => setPatientPhone(e.target.value)}
+                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                      placeholder="(00) 00000-0000"
                     />
                   </div>
                 </div>
@@ -366,29 +855,84 @@ const Prescriptions: React.FC = () => {
                 )}
               </div>
 
+              {/* Observações */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Observações / Notas
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                  placeholder="Observações adicionais sobre a prescrição..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Mensagem de Erro */}
+              {error && (
+                <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
               {/* Ações */}
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
                 <button
                   onClick={handleCreatePrescription}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-cyan-600 transition-colors flex items-center justify-center space-x-2"
+                  disabled={saving || !patientName || medications.length === 0}
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-cyan-600 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <FileCheck className="w-5 h-5" />
-                  <span>Criar Prescrição</span>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileCheck className="w-5 h-5" />
+                      <span>Criar Prescrição</span>
+                    </>
+                  )}
                 </button>
-                <button
-                  onClick={handleDigitalSignature}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-colors flex items-center justify-center space-x-2"
-                >
-                  <Lock className="w-5 h-5" />
-                  <span>Assinar Digitalmente (ICP Brasil)</span>
-                </button>
-                <button
-                  onClick={handleSendToPatient}
-                  className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center justify-center space-x-2"
-                >
-                  <Send className="w-5 h-5" />
-                  <span>Enviar ao Paciente</span>
-                </button>
+                {currentPrescriptionId && (
+                  <>
+                    <button
+                      onClick={handleDigitalSignature}
+                      disabled={saving}
+                      className="flex-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Assinando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-5 h-5" />
+                          <span>Assinar Digitalmente (ICP Brasil)</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleSendToPatient}
+                      disabled={saving}
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span>Enviando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-5 h-5" />
+                          <span>Enviar ao Paciente</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 

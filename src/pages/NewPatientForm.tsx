@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import * as XLSX from 'xlsx'
 import { 
-  ArrowLeft, 
+  ArrowLeft,
+  ArrowRight,
   User,
   Mail,
   Phone,
@@ -13,17 +15,12 @@ import {
   Upload,
   X,
   UserPlus,
-  Briefcase,
-  Camera,
-  File,
   Image as ImageIcon,
-  Save,
   FileText as FileTextIcon,
   AlertCircle,
   CheckCircle,
   Database,
-  FileSpreadsheet,
-  FolderOpen
+  Download
 } from 'lucide-react'
 
 interface UploadedFile {
@@ -39,7 +36,7 @@ const NewPatientForm: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user: currentUser } = useAuth()
-  const [mode, setMode] = useState<'manual' | 'csv' | 'database' | 'drag-drop'>('manual')
+  const [mode, setMode] = useState<'manual' | 'csv' | 'database' | 'drag-drop' | null>(null)
   const [step, setStep] = useState(1)
   const [csvData, setCsvData] = useState<any[]>([])
   const [dbConfig, setDbConfig] = useState({
@@ -165,6 +162,129 @@ const NewPatientForm: React.FC = () => {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId))
   }
 
+  // Função para mapear colunas de diferentes sistemas (Apollo/Ninsaúde, etc)
+  const mapColumnName = (header: string): string => {
+    const lower = header.toLowerCase().trim()
+    
+    // Mapeamento para nomes comuns de sistemas de prontuário
+    const columnMap: Record<string, string> = {
+      // Nome
+      'nome': 'nome',
+      'nome completo': 'nome',
+      'paciente': 'nome',
+      'nome do paciente': 'nome',
+      'nome_paciente': 'nome',
+      
+      // CPF
+      'cpf': 'cpf',
+      'documento': 'cpf',
+      'cpf/cnpj': 'cpf',
+      
+      // Email
+      'email': 'email',
+      'e-mail': 'email',
+      'correio eletrônico': 'email',
+      
+      // Telefone
+      'telefone': 'telefone',
+      'celular': 'telefone',
+      'fone': 'telefone',
+      'contato': 'telefone',
+      'telefone/celular': 'telefone',
+      
+      // Data de Nascimento
+      'data de nascimento': 'data_nascimento',
+      'data nascimento': 'data_nascimento',
+      'nascimento': 'data_nascimento',
+      'dt nasc': 'data_nascimento',
+      'dt_nasc': 'data_nascimento',
+      'data_nascimento': 'data_nascimento',
+      
+      // Sexo
+      'sexo': 'sexo',
+      'genero': 'sexo',
+      'gênero': 'sexo',
+      
+      // Endereço
+      'endereço': 'endereco',
+      'endereco': 'endereco',
+      'rua': 'endereco',
+      'logradouro': 'endereco',
+      
+      // Cidade
+      'cidade': 'cidade',
+      'município': 'cidade',
+      'municipio': 'cidade',
+      
+      // Estado
+      'estado': 'estado',
+      'uf': 'estado',
+      'estado/uf': 'estado',
+      
+      // CEP
+      'cep': 'cep',
+      'código postal': 'cep',
+      'codigo postal': 'cep'
+    }
+    
+    return columnMap[lower] || lower
+  }
+
+  // Função para processar arquivo Excel (.xlsx, .xls)
+  const handleExcelUpload = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+      
+      // Pegar primeira planilha
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      
+      // Converter para JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+      
+      if (jsonData.length < 2) {
+        alert('Planilha vazia ou sem dados')
+        return
+      }
+
+      // Primeira linha são os cabeçalhos
+      const headers = (jsonData[0] as string[]).map(h => mapColumnName(String(h || '')))
+      
+      // Processar dados
+      const data = jsonData.slice(1)
+        .filter(row => row && row.length > 0 && row.some(cell => cell))
+        .map(row => {
+          const patient: any = {}
+          headers.forEach((header, idx) => {
+            const value = row[idx]
+            if (value !== null && value !== undefined) {
+              // Converter datas do Excel
+              if (header === 'data_nascimento' && typeof value === 'number') {
+                const excelDate = XLSX.SSF.parse_date_code(value)
+                if (excelDate) {
+                  patient[header] = `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`
+                } else {
+                  patient[header] = String(value)
+                }
+              } else {
+                patient[header] = String(value).trim()
+              }
+            } else {
+              patient[header] = ''
+            }
+          })
+          return patient
+        })
+
+      setCsvData(data)
+      alert(`${data.length} paciente(s) encontrado(s) na planilha`)
+    } catch (error) {
+      console.error('Erro ao processar Excel:', error)
+      alert('Erro ao processar arquivo Excel. Verifique se o formato está correto.')
+    }
+  }
+
   // Função para processar CSV
   const handleCSVUpload = async (file: File) => {
     try {
@@ -175,21 +295,40 @@ const NewPatientForm: React.FC = () => {
         return
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-      const data = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim())
-        const patient: any = {}
-        headers.forEach((header, idx) => {
-          patient[header] = values[idx] || ''
+      // Detectar separador (vírgula ou ponto e vírgula)
+      const separator = lines[0].includes(';') ? ';' : ','
+      
+      const headers = lines[0].split(separator).map((h: string) => mapColumnName(h.trim()))
+      const data = lines.slice(1)
+        .filter((line: string) => line.trim())
+        .map((line: string) => {
+          const values = line.split(separator).map((v: string) => v.trim().replace(/^["']|["']$/g, ''))
+          const patient: any = {}
+          headers.forEach((header: string, idx: number) => {
+            patient[header] = values[idx] || ''
+          })
+          return patient
         })
-        return patient
-      })
+        .filter((patient: any) => patient.nome && patient.nome.trim()) // Filtrar linhas vazias
 
       setCsvData(data)
       alert(`${data.length} paciente(s) encontrado(s) no CSV`)
     } catch (error) {
       console.error('Erro ao processar CSV:', error)
       alert('Erro ao processar arquivo CSV')
+    }
+  }
+
+  // Função unificada para processar arquivo (CSV ou Excel)
+  const handleSpreadsheetUpload = async (file: File) => {
+    const fileName = file.name.toLowerCase()
+    
+    if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+      await handleExcelUpload(file)
+    } else if (fileName.endsWith('.csv')) {
+      await handleCSVUpload(file)
+    } else {
+      alert('Formato não suportado. Use arquivos CSV ou Excel (.xlsx, .xls)')
     }
   }
 
@@ -358,7 +497,8 @@ const NewPatientForm: React.FC = () => {
     if (type.startsWith('image/')) return <ImageIcon className="w-5 h-5 text-blue-400" />
     if (type.includes('pdf')) return <FileTextIcon className="w-5 h-5 text-red-400" />
     if (type.includes('word')) return <FileTextIcon className="w-5 h-5 text-blue-500" />
-    return <File className="w-5 h-5 text-slate-400" />
+    if (type.includes('excel') || type.includes('spreadsheet') || type.includes('csv')) return <Download className="w-5 h-5 text-green-400" />
+    return <FileTextIcon className="w-5 h-5 text-slate-400" />
   }
 
   const formatFileSize = (bytes: number) => {
@@ -575,6 +715,7 @@ const NewPatientForm: React.FC = () => {
               <div>
                 <h1 className="text-3xl font-bold text-white mb-2">Novo Paciente</h1>
                 <p className="text-slate-400">
+                  {mode === null && 'Escolha o método de cadastro'}
                   {mode === 'manual' && 'Cadastro manual e importação de documentos'}
                   {mode === 'csv' && 'Importar pacientes de arquivo CSV'}
                   {mode === 'database' && 'Importar pacientes de banco de dados externo'}
@@ -587,40 +728,130 @@ const NewPatientForm: React.FC = () => {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {[
-              { num: 1, label: 'Dados Pessoais' },
-              { num: 2, label: 'Atendimento' },
-              { num: 3, label: 'Documentos' }
-            ].map((s, idx) => (
-              <div key={s.num} className="flex items-center flex-1">
-                <div className="flex flex-col items-center flex-1">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
-                      step >= s.num
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-700 text-slate-400'
-                    }`}
-                  >
-                    {step > s.num ? <CheckCircle className="w-5 h-5" /> : s.num}
+        {/* Tela de Seleção Inicial */}
+        {mode === null && (
+          <div className="space-y-6">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 border border-slate-700/50">
+              <h2 className="text-2xl font-bold text-white mb-4 text-center">Como deseja cadastrar os pacientes?</h2>
+              <p className="text-slate-400 text-center mb-8">Escolha o método mais adequado para seu caso</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Opção 1: Cadastro Manual */}
+                <button
+                  onClick={() => setMode('manual')}
+                  className="group relative bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-2 border-blue-500/30 rounded-xl p-6 hover:border-blue-500/60 hover:from-blue-600/30 hover:to-blue-800/30 transition-all duration-300 text-left"
+                >
+                  <div className="flex flex-col items-start space-y-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <UserPlus className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-2">Cadastro Manual</h3>
+                      <p className="text-slate-300 text-sm">
+                        Cadastre pacientes um a um através de formulário completo. Ideal para cadastros individuais ou pequenos volumes.
+                      </p>
+                    </div>
+                    <div className="flex items-center text-blue-400 font-semibold group-hover:text-blue-300">
+                      <span>Começar cadastro manual</span>
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
-                  <span className={`text-sm mt-2 ${step >= s.num ? 'text-white' : 'text-slate-400'}`}>
-                    {s.label}
-                  </span>
-                </div>
-                {idx < 2 && (
-                  <div className={`flex-1 h-0.5 mx-2 ${step > s.num ? 'bg-blue-500' : 'bg-slate-700'}`} />
-                )}
+                </button>
+
+                {/* Opção 2: Importação CSV */}
+                <button
+                  onClick={() => setMode('csv')}
+                  className="group relative bg-gradient-to-br from-green-600/20 to-emerald-800/20 border-2 border-green-500/30 rounded-xl p-6 hover:border-green-500/60 hover:from-green-600/30 hover:to-emerald-800/30 transition-all duration-300 text-left"
+                >
+                  <div className="flex flex-col items-start space-y-4">
+                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Download className="w-8 h-8 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-2">Importação em Massa (CSV)</h3>
+                      <p className="text-slate-300 text-sm">
+                        Importe múltiplos pacientes de uma vez através de arquivo CSV. Ideal para cadastros em lote ou migração de dados.
+                      </p>
+                    </div>
+                    <div className="flex items-center text-green-400 font-semibold group-hover:text-green-300">
+                      <span>Importar CSV</span>
+                      <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </button>
               </div>
-            ))}
+
+              {/* Informações adicionais */}
+              <div className="mt-8 pt-6 border-t border-slate-700/50">
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-slate-300">
+                      <p className="font-semibold text-white mb-1">Dica:</p>
+                      <p>Você pode importar planilhas do <strong>Apollo/Ninsaúde</strong> ou da <strong>Clínica de Rio Bonito</strong>. O sistema reconhece automaticamente diferentes formatos de colunas.</p>
+                      <p className="mt-2">Colunas recomendadas: <span className="font-mono text-xs bg-slate-800 px-2 py-1 rounded">nome, cpf, email, telefone, data_nascimento, sexo</span></p>
+                    </div>
+                  </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Progress Steps - Só mostra quando há um modo selecionado */}
+        {mode !== null && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              {[
+                { num: 1, label: 'Dados Pessoais' },
+                { num: 2, label: 'Atendimento' },
+                { num: 3, label: 'Documentos' }
+              ].map((s, idx) => (
+                <div key={s.num} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center flex-1">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
+                        step >= s.num
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-slate-700 text-slate-400'
+                      }`}
+                    >
+                      {step > s.num ? <CheckCircle className="w-5 h-5" /> : s.num}
+                    </div>
+                    <span className={`text-sm mt-2 ${step >= s.num ? 'text-white' : 'text-slate-400'}`}>
+                      {s.label}
+                    </span>
+                  </div>
+                  {idx < 2 && (
+                    <div className={`flex-1 h-0.5 mx-2 ${step > s.num ? 'bg-blue-500' : 'bg-slate-700'}`} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Botão Voltar - Só mostra quando há um modo selecionado */}
+        {mode !== null && (
+          <div className="mb-4">
+            <button
+              onClick={() => {
+                setMode(null)
+                setStep(1)
+                setCsvData([])
+                setDragDropFiles([])
+              }}
+              className="flex items-center space-x-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Voltar para seleção</span>
+            </button>
+          </div>
+        )}
 
         {/* Form Content - Modo específico */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 mb-6">
-          {mode === 'manual' && (
+        {mode !== null && (
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 mb-6">
+            {mode === 'manual' && (
             <>
               {step === 1 && (
             <div className="space-y-6">
@@ -1019,7 +1250,7 @@ const NewPatientForm: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Save className="w-5 h-5" />
+                      <CheckCircle className="w-5 h-5" />
                       <span>Salvar Paciente</span>
                     </>
                   )}
@@ -1034,17 +1265,24 @@ const NewPatientForm: React.FC = () => {
           {mode === 'csv' && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <FileSpreadsheet className="w-6 h-6 text-green-400" />
-                <span>Importar Pacientes de CSV</span>
+                <Download className="w-6 h-6 text-green-400" />
+                <span>Importar Pacientes em Massa</span>
               </h2>
 
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6">
                 <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-slate-300">
-                    <p className="font-semibold text-white mb-1">Formato do CSV</p>
-                    <p>O arquivo CSV deve conter as colunas: nome, cpf, email, telefone, data_nascimento, sexo, endereco, cidade, estado, cep</p>
-                    <p className="mt-2 text-yellow-400">Importante: O CSV deve ter cabeçalho na primeira linha.</p>
+                    <p className="font-semibold text-white mb-2">Formatos Suportados</p>
+                    <p className="mb-2">✅ <strong>CSV</strong> (.csv)</p>
+                    <p className="mb-2">✅ <strong>Excel</strong> (.xlsx, .xls)</p>
+                    <p className="mb-2">✅ <strong>Apollo/Ninsaúde</strong> - Exporte sua planilha de pacientes</p>
+                    <p className="mb-2">✅ <strong>Rio Bonito</strong> - Planilhas da clínica</p>
+                    <p className="mt-3 text-yellow-400 font-semibold">📋 Colunas Recomendadas:</p>
+                    <p className="text-xs font-mono bg-slate-800 px-2 py-1 rounded mt-1">
+                      nome, cpf, email, telefone, data_nascimento, sexo, endereco, cidade, estado, cep
+                    </p>
+                    <p className="mt-2 text-green-400">💡 <strong>Dica:</strong> O sistema reconhece automaticamente diferentes nomes de colunas (ex: "Nome do Paciente", "CPF", etc.)</p>
                   </div>
                 </div>
               </div>
@@ -1058,8 +1296,13 @@ const NewPatientForm: React.FC = () => {
                   e.stopPropagation()
                   setDragActive(false)
                   const files = e.dataTransfer.files
-                  if (files.length > 0 && files[0].name.endsWith('.csv')) {
-                    handleCSVUpload(files[0])
+                  if (files.length > 0) {
+                    const fileName = files[0].name.toLowerCase()
+                    if (fileName.endsWith('.csv') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                      handleSpreadsheetUpload(files[0])
+                    } else {
+                      alert('Formato não suportado. Use arquivos CSV ou Excel (.xlsx, .xls)')
+                    }
                   }
                 }}
                 className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
@@ -1068,19 +1311,22 @@ const NewPatientForm: React.FC = () => {
                     : 'border-slate-700 bg-slate-700/30 hover:border-slate-600'
                 }`}
               >
-                <FileSpreadsheet className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-green-400' : 'text-slate-400'}`} />
+                <Download className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-green-400' : 'text-slate-400'}`} />
                 <p className="text-lg font-semibold text-white mb-2">
-                  Arraste o arquivo CSV aqui ou clique para selecionar
+                  Arraste sua planilha aqui ou clique para selecionar
+                </p>
+                <p className="text-sm text-slate-400 mb-4">
+                  Suporta CSV e Excel (Apollo/Ninsaúde, Rio Bonito, etc.)
                 </p>
                 <label className="inline-block px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors cursor-pointer">
-                  Selecionar CSV
+                  Selecionar Planilha
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".csv,.xlsx,.xls"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
-                        handleCSVUpload(e.target.files[0])
+                        handleSpreadsheetUpload(e.target.files[0])
                       }
                     }}
                   />
@@ -1112,7 +1358,7 @@ const NewPatientForm: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <Save className="w-5 h-5" />
+                        <CheckCircle className="w-5 h-5" />
                         <span>Importar {csvData.length} paciente(s)</span>
                       </>
                     )}
@@ -1242,7 +1488,7 @@ const NewPatientForm: React.FC = () => {
           {mode === 'drag-drop' && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <FolderOpen className="w-6 h-6 text-cyan-400" />
+                <Database className="w-6 h-6 text-cyan-400" />
                 <span>Arrastar e Soltar Arquivos</span>
               </h2>
 
@@ -1353,7 +1599,7 @@ const NewPatientForm: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <Save className="w-5 h-5" />
+                        <CheckCircle className="w-5 h-5" />
                         <span>Processar {dragDropFiles.length} arquivo(s)</span>
                       </>
                     )}
@@ -1362,6 +1608,8 @@ const NewPatientForm: React.FC = () => {
               )}
             </div>
           )}
+          </div>
+        )}
         </div>
       </div>
     </div>

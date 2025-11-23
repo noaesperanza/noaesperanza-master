@@ -6,9 +6,14 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true, // Permite acesso de outros dispositivos na rede
+    strictPort: false, // Tenta outra porta se 3000 estiver ocupada
     hmr: {
-      overlay: true
-    }
+      overlay: true,
+      host: 'localhost' // HMR funciona melhor com localhost
+    },
+    // Configurações adicionais para melhor compatibilidade
+    cors: true,
+    proxy: {} // Pode adicionar proxies se necessário
   },
   optimizeDeps: {
     include: ['@xenova/transformers'],

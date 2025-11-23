@@ -117,7 +117,7 @@ export class NoaKnowledgeBase {
       const { data, error } = await supabase
         .from('noa_memories')
         .select('*')
-        .or(`title.ilike.%${query}%, content.ilike.%${query}%, summary.ilike.%${query}%`)
+        .or(`title.ilike.*${query}*,content.ilike.*${query}*,summary.ilike.*${query}*`)
         .order('created_at', { ascending: false })
         .limit(limit)
 
@@ -361,7 +361,7 @@ export class NoaKnowledgeBase {
       const { data, error } = await supabase
         .from('noa_articles')
         .select('*')
-        .or(`title.ilike.%${query}%, content.ilike.%${query}%, summary.ilike.%${query}%, keywords.cs.{${query}}`)
+        .or(`title.ilike.*${query}*,content.ilike.*${query}*,summary.ilike.*${query}*,keywords.cs.{${query}}`)
         .limit(5)
 
       if (error) throw error
@@ -381,7 +381,7 @@ export class NoaKnowledgeBase {
       const { data, error } = await supabase
         .from('noa_clinical_cases')
         .select('*')
-        .or(`chief_complaint.ilike.%${query}%, history.ilike.%${query}%, findings.ilike.%${query}%, diagnosis.ilike.%${query}%`)
+        .or(`chief_complaint.ilike.*${query}*,history.ilike.*${query}*,findings.ilike.*${query}*,diagnosis.ilike.*${query}*`)
         .limit(5)
 
       if (error) throw error
@@ -401,7 +401,7 @@ export class NoaKnowledgeBase {
       const { data, error } = await supabase
         .from('noa_lessons')
         .select('*')
-        .or(`lesson_title.ilike.%${query}%, content.ilike.%${query}%`)
+        .or(`lesson_title.ilike.*${query}*,content.ilike.*${query}*`)
         .limit(5)
 
       if (error) throw error

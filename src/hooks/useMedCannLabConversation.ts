@@ -454,6 +454,15 @@ export const useMedCannLabConversation = () => {
     if (!lastMessage || lastMessage.role !== 'noa') {
       return
     }
+    
+    console.log('🔍 Verificando síntese de voz para mensagem:', {
+      messageId: lastMessage.id,
+      role: lastMessage.role,
+      speechEnabled: speechEnabledRef.current,
+      voicesReady,
+      voicesCount: voicesRef.current.length,
+      hasSpeechSynthesis: typeof window !== 'undefined' && 'speechSynthesis' in window
+    })
 
     // Evitar falar mensagem de boas-vindas duplicada
     // Se já foi falada uma vez, não falar novamente
@@ -555,6 +564,10 @@ export const useMedCannLabConversation = () => {
 
     revealStep()
 
+    // Adicionar delay antes de iniciar a síntese de voz
+    // Isso dá tempo para o usuário pensar e processar a resposta antes da IA falar
+    const startSpeakingDelay = 800 // 0.8 segundos de delay antes de falar (reduzido para não ser muito longo)
+    
     const utterance = new SpeechSynthesisUtterance(sanitized.length > 0 ? sanitized : fullContent)
     utterance.lang = 'pt-BR'
     utterance.rate = 1.15 // Andante (mais rápido que o anterior 0.94)
@@ -600,12 +613,17 @@ export const useMedCannLabConversation = () => {
       }
     }
     utterance.onend = () => {
+      console.log('🔇 Síntese de voz finalizada')
       const current = speechQueueRef.current
       if (current && current.messageId === lastMessage.id) {
         if (!current.timer) {
           speechQueueRef.current = null
           updateMessageContent(current.messageId, current.fullContent)
-          setIsSpeaking(false)
+          // Aguardar antes de marcar como não falando para evitar conflito com reconhecimento
+          setTimeout(() => {
+            setIsSpeaking(false)
+            console.log('✅ Estado isSpeaking atualizado para false (onend sem timer)')
+          }, 300)
         } else {
           current.cancelled = false
           const finalize = () => {
@@ -618,12 +636,20 @@ export const useMedCannLabConversation = () => {
               updateMessageContent(state.messageId, state.fullContent)
               speechQueueRef.current = null
             }
-            setIsSpeaking(false)
+            // Aguardar antes de marcar como não falando
+            setTimeout(() => {
+              setIsSpeaking(false)
+              console.log('✅ Estado isSpeaking atualizado para false (onend com timer)')
+            }, 300)
           }
           current.timer = window.setTimeout(finalize, 80)
         }
       } else {
-        setIsSpeaking(false)
+        // Aguardar antes de marcar como não falando
+        setTimeout(() => {
+          setIsSpeaking(false)
+          console.log('✅ Estado isSpeaking atualizado para false (onend sem current)')
+        }, 300)
       }
     }
 
@@ -641,36 +667,104 @@ export const useMedCannLabConversation = () => {
         updateMessageContent(current.messageId, current.fullContent)
         speechQueueRef.current = null
       }
-      setIsSpeaking(false)
+      // Aguardar antes de marcar como não falando
+      setTimeout(() => {
+        setIsSpeaking(false)
+        console.log('✅ Estado isSpeaking atualizado para false (após erro)')
+      }, 300)
     }
 
-    // Cancelar qualquer fala anterior e falar
+    // Cancelar qualquer fala anterior e iniciar após delay
     try {
-      window.speechSynthesis.cancel()
-      console.log('🔊 Iniciando síntese de voz para mensagem:', lastMessage.id)
-      // Pequeno delay para garantir que o cancelamento foi processado
+      // Cancelar apenas se estiver falando algo
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel()
+      }
+      
+      // Aguardar delay antes de iniciar a síntese de voz
+      // Isso dá tempo para o usuário pensar e processar antes da IA responder
       setTimeout(() => {
         try {
-          if (window.speechSynthesis.speaking) {
-            window.speechSynthesis.cancel()
+          // Verificar se a mensagem ainda é a última e se não foi cancelada
+          const currentQueue = speechQueueRef.current
+          if (!currentQueue) {
+            console.warn('⚠️ Queue não encontrada, cancelando síntese')
+            return
           }
-          window.speechSynthesis.speak(utterance)
-          console.log('✅ Síntese de voz iniciada. Voz:', utterance.voice?.name || 'padrão')
+          if (currentQueue.messageId !== lastMessage.id) {
+            console.warn('⚠️ Mensagem mudou durante delay, cancelando síntese:', {
+              queueId: currentQueue.messageId,
+              lastMessageId: lastMessage.id
+            })
+            return
+          }
+          if (currentQueue.cancelled) {
+            console.warn('⚠️ Queue foi cancelada, não iniciando síntese')
+            return
+          }
+          
+          // Verificar se síntese de voz ainda está habilitada
+          if (!speechEnabledRef.current) {
+            console.warn('⚠️ Síntese de voz desabilitada')
+            return
+          }
+          
+          // Verificar se speechSynthesis ainda está disponível
+          if (!window.speechSynthesis) {
+            console.warn('⚠️ speechSynthesis não disponível')
+            return
+          }
+          
+          // Verificar se ainda está falando antes de iniciar nova síntese
+          if (window.speechSynthesis.speaking) {
+            console.log('⚠️ Ainda há síntese em andamento, aguardando...')
+            // Aguardar um pouco mais antes de tentar novamente
+            setTimeout(() => {
+              if (!window.speechSynthesis.speaking) {
+                window.speechSynthesis.speak(utterance)
+                setIsSpeaking(true)
+                console.log('✅ Síntese de voz iniciada após aguardar. Voz:', utterance.voice?.name || 'padrão')
+              } else {
+                // Se ainda estiver falando, cancelar e iniciar nova
+                window.speechSynthesis.cancel()
+                setTimeout(() => {
+                  window.speechSynthesis.speak(utterance)
+                  setIsSpeaking(true)
+                  console.log('✅ Síntese de voz iniciada após cancelamento. Voz:', utterance.voice?.name || 'padrão')
+                }, 200)
+              }
+            }, 500)
+          } else {
+            console.log('🔊 Iniciando síntese de voz após delay:', {
+              messageId: lastMessage.id,
+              voice: utterance.voice?.name || 'padrão',
+              textLength: sanitized.length
+            })
+            setIsSpeaking(true)
+            window.speechSynthesis.speak(utterance)
+            console.log('✅ Síntese de voz iniciada. Voz:', utterance.voice?.name || 'padrão')
+          }
+        } catch (speakError) {
+          console.error('❌ Erro ao iniciar síntese de voz:', speakError)
+          setIsSpeaking(false)
+        }
+      }, startSpeakingDelay)
+    } catch (cancelError) {
+      console.warn('⚠️ Erro ao cancelar síntese de voz:', cancelError)
+      // Tentar falar mesmo assim após delay
+      setTimeout(() => {
+        try {
+          // Verificar se a mensagem ainda é a última e se não foi cancelada
+          const currentQueue = speechQueueRef.current
+          if (currentQueue && currentQueue.messageId === lastMessage.id && !currentQueue.cancelled) {
+            window.speechSynthesis.speak(utterance)
+            console.log('✅ Síntese de voz iniciada (após erro de cancelamento)')
+          }
         } catch (speakError) {
           console.warn('⚠️ Erro ao iniciar síntese de voz:', speakError)
           setIsSpeaking(false)
         }
-      }, 50)
-    } catch (cancelError) {
-      console.warn('⚠️ Erro ao cancelar síntese de voz:', cancelError)
-      // Tentar falar mesmo assim
-      try {
-        window.speechSynthesis.speak(utterance)
-        console.log('✅ Síntese de voz iniciada (após erro de cancelamento)')
-      } catch (speakError) {
-        console.warn('⚠️ Erro ao iniciar síntese de voz:', speakError)
-        setIsSpeaking(false)
-      }
+      }, startSpeakingDelay)
     }
 
     return () => {

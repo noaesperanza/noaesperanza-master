@@ -116,7 +116,10 @@ const Patients: React.FC = () => {
           <p className="text-slate-300">Gerencie seus pacientes e acompanhe o tratamento</p>
         </div>
         <div className="mt-4 md:mt-0">
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors">
+          <button 
+            onClick={() => navigate('/app/new-patient')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
+          >
             <Plus className="w-5 h-5" />
             <span>Novo Paciente</span>
           </button>

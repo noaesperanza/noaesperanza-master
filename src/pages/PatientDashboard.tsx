@@ -1588,93 +1588,7 @@ const PatientDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Progresso do Plano Terapêutico */}
-        {therapeuticPlan && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Target className="w-6 h-6 text-primary-300" />
-                Progresso do Plano Terapêutico
-              </h3>
-              <span className="text-2xl font-bold text-primary-300">{progressoPlano}%</span>
-            </div>
-            <div className="w-full h-3 rounded-full bg-slate-800">
-              <div
-                className="h-3 rounded-full transition-all bg-gradient-to-r from-primary-500 to-emerald-500"
-                style={{ width: `${progressoPlano}%` }}
-              />
-            </div>
-            <p className="text-base text-slate-400 mt-2">{therapeuticPlan.title}</p>
-          </div>
-        )}
-
-        {/* Analytics de Uso */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
-          <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-4">
-            <BarChart3 className="w-6 h-6 text-primary-300" />
-            Analytics de Uso
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Engajamento */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity className="w-6 h-6 text-emerald-400" />
-                <h4 className="text-base font-semibold text-white">Engajamento</h4>
-              </div>
-              <div className="space-y-2 text-base">
-                <div className="flex justify-between text-slate-300">
-                  <span>Consultas realizadas:</span>
-                  <span className="font-semibold text-white">{consultasConcluidas}</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>Prescrições ativas:</span>
-                  <span className="font-semibold text-white">{prescricoesAtivas}</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>Recursos acessados:</span>
-                  <span className="font-semibold text-white">{totalRecursosEducacionais}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Atividade Recente */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-6 h-6 text-blue-400" />
-                <h4 className="text-base font-semibold text-white">Atividade Recente</h4>
-              </div>
-              <div className="space-y-2 text-base">
-                {latestClinicalReport && (
-                  <div className="flex justify-between text-slate-300">
-                    <span>Último relatório:</span>
-                    <span className="font-semibold text-white">
-                      {latestClinicalReport.generated_at 
-                        ? new Date(latestClinicalReport.generated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-                        : 'N/A'}
-                    </span>
-                  </div>
-                )}
-                {appointments.length > 0 && (
-                  <div className="flex justify-between text-slate-300">
-                    <span>Próxima consulta:</span>
-                    <span className="font-semibold text-white">
-                      {appointments
-                        .filter(apt => apt.status === 'scheduled')
-                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]
-                        ? new Date(appointments
-                            .filter(apt => apt.status === 'scheduled')
-                            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date)
-                            .toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-                        : 'Nenhuma agendada'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Cards de Ações Rápidas */}
+        {/* Cards de Ações Rápidas - MOVIDO PARA O TOPO */}
         <div className="space-y-6">
           <h3 className="text-xl font-semibold text-white flex items-center gap-2">
             <Zap className="w-6 h-6 text-amber-400" />
@@ -1901,6 +1815,92 @@ const PatientDashboard: React.FC = () => {
                   Iniciar avaliação clínica
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Progresso do Plano Terapêutico - MOVIDO PARA DEPOIS DAS AÇÕES RÁPIDAS */}
+        {therapeuticPlan && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Target className="w-6 h-6 text-primary-300" />
+                Progresso do Plano Terapêutico
+              </h3>
+              <span className="text-2xl font-bold text-primary-300">{progressoPlano}%</span>
+            </div>
+            <div className="w-full h-3 rounded-full bg-slate-800">
+              <div
+                className="h-3 rounded-full transition-all bg-gradient-to-r from-primary-500 to-emerald-500"
+                style={{ width: `${progressoPlano}%` }}
+              />
+            </div>
+            <p className="text-base text-slate-400 mt-2">{therapeuticPlan.title}</p>
+          </div>
+        )}
+
+        {/* Analytics de Uso - MOVIDO PARA O FINAL */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+          <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-4">
+            <BarChart3 className="w-6 h-6 text-primary-300" />
+            Analytics de Uso
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Engajamento */}
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <div className="flex items-center gap-2 mb-3">
+                <Activity className="w-6 h-6 text-emerald-400" />
+                <h4 className="text-base font-semibold text-white">Engajamento</h4>
+              </div>
+              <div className="space-y-2 text-base">
+                <div className="flex justify-between text-slate-300">
+                  <span>Consultas realizadas:</span>
+                  <span className="font-semibold text-white">{consultasConcluidas}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Prescrições ativas:</span>
+                  <span className="font-semibold text-white">{prescricoesAtivas}</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span>Recursos acessados:</span>
+                  <span className="font-semibold text-white">{totalRecursosEducacionais}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Atividade Recente */}
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-6 h-6 text-blue-400" />
+                <h4 className="text-base font-semibold text-white">Atividade Recente</h4>
+              </div>
+              <div className="space-y-2 text-base">
+                {latestClinicalReport && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>Último relatório:</span>
+                    <span className="font-semibold text-white">
+                      {latestClinicalReport.generated_at 
+                        ? new Date(latestClinicalReport.generated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+                        : 'N/A'}
+                    </span>
+                  </div>
+                )}
+                {appointments.length > 0 && (
+                  <div className="flex justify-between text-slate-300">
+                    <span>Próxima consulta:</span>
+                    <span className="font-semibold text-white">
+                      {appointments
+                        .filter(apt => apt.status === 'scheduled')
+                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0]
+                        ? new Date(appointments
+                            .filter(apt => apt.status === 'scheduled')
+                            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date)
+                            .toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+                        : 'Nenhuma agendada'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
