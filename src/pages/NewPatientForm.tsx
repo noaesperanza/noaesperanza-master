@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import * as XLSX from 'xlsx'
-import { 
+import {
   ArrowLeft,
   ArrowRight,
   User,
@@ -82,7 +82,7 @@ const NewPatientForm: React.FC = () => {
     { id: 'ricardo', name: 'Dr. Ricardo Valença', specialty: 'Cannabis Medicinal Integrativa', crm: 'CRM-RJ 123456' },
     { id: 'eduardo', name: 'Dr. Eduardo Faveret', specialty: 'Cannabis Medicinal Integrativa', crm: 'CRM-RJ 789012' }
   ]
-  
+
   // Definir profissional padrão se o usuário atual for um dos profissionais listados
   useEffect(() => {
     if (currentUser?.id && !formData.professionalId) {
@@ -152,7 +152,7 @@ const NewPatientForm: React.FC = () => {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
+
     if (e.dataTransfer.files) {
       handleFileUpload(e.dataTransfer.files)
     }
@@ -165,7 +165,7 @@ const NewPatientForm: React.FC = () => {
   // Função para mapear colunas de diferentes sistemas (Apollo/Ninsaúde, etc)
   const mapColumnName = (header: string): string => {
     const lower = header.toLowerCase().trim()
-    
+
     // Mapeamento para nomes comuns de sistemas de prontuário
     const columnMap: Record<string, string> = {
       // Nome
@@ -174,24 +174,24 @@ const NewPatientForm: React.FC = () => {
       'paciente': 'nome',
       'nome do paciente': 'nome',
       'nome_paciente': 'nome',
-      
+
       // CPF
       'cpf': 'cpf',
       'documento': 'cpf',
       'cpf/cnpj': 'cpf',
-      
+
       // Email
       'email': 'email',
       'e-mail': 'email',
       'correio eletrônico': 'email',
-      
+
       // Telefone
       'telefone': 'telefone',
       'celular': 'telefone',
       'fone': 'telefone',
       'contato': 'telefone',
       'telefone/celular': 'telefone',
-      
+
       // Data de Nascimento
       'data de nascimento': 'data_nascimento',
       'data nascimento': 'data_nascimento',
@@ -199,34 +199,34 @@ const NewPatientForm: React.FC = () => {
       'dt nasc': 'data_nascimento',
       'dt_nasc': 'data_nascimento',
       'data_nascimento': 'data_nascimento',
-      
+
       // Sexo
       'sexo': 'sexo',
       'genero': 'sexo',
       'gênero': 'sexo',
-      
+
       // Endereço
       'endereço': 'endereco',
       'endereco': 'endereco',
       'rua': 'endereco',
       'logradouro': 'endereco',
-      
+
       // Cidade
       'cidade': 'cidade',
       'município': 'cidade',
       'municipio': 'cidade',
-      
+
       // Estado
       'estado': 'estado',
       'uf': 'estado',
       'estado/uf': 'estado',
-      
+
       // CEP
       'cep': 'cep',
       'código postal': 'cep',
       'codigo postal': 'cep'
     }
-    
+
     return columnMap[lower] || lower
   }
 
@@ -235,14 +235,14 @@ const NewPatientForm: React.FC = () => {
     try {
       const arrayBuffer = await file.arrayBuffer()
       const workbook = XLSX.read(arrayBuffer, { type: 'array' })
-      
+
       // Pegar primeira planilha
       const firstSheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[firstSheetName]
-      
+
       // Converter para JSON
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
-      
+
       if (jsonData.length < 2) {
         alert('Planilha vazia ou sem dados')
         return
@@ -250,7 +250,7 @@ const NewPatientForm: React.FC = () => {
 
       // Primeira linha são os cabeçalhos
       const headers = (jsonData[0] as string[]).map(h => mapColumnName(String(h || '')))
-      
+
       // Processar dados
       const data = jsonData.slice(1)
         .filter(row => row && row.length > 0 && row.some(cell => cell))
@@ -297,7 +297,7 @@ const NewPatientForm: React.FC = () => {
 
       // Detectar separador (vírgula ou ponto e vírgula)
       const separator = lines[0].includes(';') ? ';' : ','
-      
+
       const headers = lines[0].split(separator).map((h: string) => mapColumnName(h.trim()))
       const data = lines.slice(1)
         .filter((line: string) => line.trim())
@@ -322,7 +322,7 @@ const NewPatientForm: React.FC = () => {
   // Função unificada para processar arquivo (CSV ou Excel)
   const handleSpreadsheetUpload = async (file: File) => {
     const fileName = file.name.toLowerCase()
-    
+
     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
       await handleExcelUpload(file)
     } else if (fileName.endsWith('.csv')) {
@@ -335,7 +335,7 @@ const NewPatientForm: React.FC = () => {
   // Função para importar em lote (CSV)
   const handleBulkSubmit = async () => {
     if (csvData.length === 0) return
-    
+
     setIsSubmitting(true)
     let successCount = 0
     let errorCount = 0
@@ -352,13 +352,13 @@ const NewPatientForm: React.FC = () => {
       }
 
       alert(`Importação concluída!\n\n${successCount} paciente(s) criado(s) com sucesso\n${errorCount} erro(s)`)
-      
+
       // Aguardar um pouco para garantir que o banco foi atualizado
       await new Promise(resolve => setTimeout(resolve, 500))
-      
+
       // Navegar e forçar reload
       navigate('/app/patients', { replace: true })
-      
+
       // Forçar reload da página para garantir que os dados sejam atualizados
       window.location.reload()
     } catch (error) {
@@ -376,7 +376,7 @@ const NewPatientForm: React.FC = () => {
       // Aqui você implementaria a conexão real com o banco de dados
       // Por segurança, isso deveria ser feito via uma API backend
       alert('Funcionalidade de importação de banco de dados externo requer configuração no backend.\n\nPor favor, use a API ou uma função RPC no Supabase para conectar com bancos externos.')
-      
+
       // Exemplo de como seria (requer implementação no backend):
       // const response = await fetch('/api/import-from-database', {
       //   method: 'POST',
@@ -395,7 +395,7 @@ const NewPatientForm: React.FC = () => {
   // Função para processar arquivos arrastados
   const handleDragDropProcess = async () => {
     if (dragDropFiles.length === 0) return
-    
+
     setIsSubmitting(true)
     let successCount = 0
     let errorCount = 0
@@ -510,14 +510,14 @@ const NewPatientForm: React.FC = () => {
   const handleSubmit = async () => {
     console.log('🚀 Iniciando handleSubmit...', { formData })
     setIsSubmitting(true)
-    
+
     try {
       if (!formData.name || !formData.email.trim()) {
         alert('Por favor, preencha todos os campos obrigatórios (Nome Completo e Email).')
         setIsSubmitting(false)
         return
       }
-      
+
       console.log('✅ Validação básica passou:', { name: formData.name, email: formData.email })
 
       // Usar email fornecido (agora obrigatório)
@@ -574,9 +574,9 @@ const NewPatientForm: React.FC = () => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
-      
+
       // Nota: campos 'phone' e 'address' não existem na tabela users, então foram removidos
-      
+
       const { data: newUser, error: userError } = await supabase
         .from('users')
         .insert(userData)
@@ -592,16 +592,16 @@ const NewPatientForm: React.FC = () => {
 
       // Criar avaliação clínica inicial vinculada ao profissional atual
       // Usar o ID do profissional selecionado ou o usuário atual
-      const doctorId = formData.professionalId === 'ricardo' || formData.professionalId === 'eduardo' 
-        ? currentUser?.id 
+      const doctorId = formData.professionalId === 'ricardo' || formData.professionalId === 'eduardo'
+        ? currentUser?.id
         : (formData.professionalId || currentUser?.id)
-      
-      console.log('🔍 Doctor ID para avaliação:', { 
-        professionalId: formData.professionalId, 
-        doctorId, 
-        currentUserId: currentUser?.id 
+
+      console.log('🔍 Doctor ID para avaliação:', {
+        professionalId: formData.professionalId,
+        doctorId,
+        currentUserId: currentUser?.id
       })
-      
+
       if (doctorId) {
         const { error: assessmentError } = await supabase
           .from('clinical_assessments')
@@ -610,18 +610,18 @@ const NewPatientForm: React.FC = () => {
             doctor_id: doctorId,
             assessment_type: 'INITIAL',
             status: 'pending',
-          data: {
-            cpf: formData.cpf || null,
-            age,
-            months,
-            days,
-            gender: formData.gender,
-            specialty: formData.specialty,
-            referringDoctor: formData.referringDoctor,
-            room: formData.room,
-            observations: formData.observations,
-            patientCode
-          },
+            data: {
+              cpf: formData.cpf || null,
+              age,
+              months,
+              days,
+              gender: formData.gender,
+              specialty: formData.specialty,
+              referringDoctor: formData.referringDoctor,
+              room: formData.room,
+              observations: formData.observations,
+              patientCode
+            },
             created_at: new Date().toISOString()
           })
 
@@ -638,12 +638,12 @@ const NewPatientForm: React.FC = () => {
             // Upload para o storage (se configurado)
             const fileExt = file.file.name.split('.').pop()
             const fileName = `${patientId}/${Date.now()}_${file.file.name}`
-            
+
             // Aqui você pode implementar o upload para o Supabase Storage
             // const { error: uploadError } = await supabase.storage
             //   .from('patient-documents')
             //   .upload(fileName, file.file)
-            
+
             console.log('Arquivo anexado:', fileName)
           } catch (uploadError) {
             console.error('Erro ao fazer upload do arquivo:', uploadError)
@@ -653,15 +653,15 @@ const NewPatientForm: React.FC = () => {
       }
 
       alert(`Paciente cadastrado com sucesso!\n\nID: ${patientId}\nEmail: ${patientEmail}\nCódigo: ${patientCode}`)
-      
+
       // Aguardar um pouco para garantir que o banco foi atualizado
       await new Promise(resolve => setTimeout(resolve, 500))
-      
+
       // Navegar e forçar reload
       navigate('/app/patients', { replace: true })
-      
+
       console.log('✅ Paciente criado com sucesso! Redirecionando...')
-      
+
       // Forçar reload da página para garantir que os dados sejam atualizados
       setTimeout(() => {
         window.location.reload()
@@ -682,7 +682,7 @@ const NewPatientForm: React.FC = () => {
 
   const isStep1Valid = formData.name && formData.email.trim()
   const isStep2Valid = formData.professionalId && formData.specialty
-  
+
   // Debug: logar validação do step 2
   useEffect(() => {
     if (step === 2) {
@@ -734,7 +734,7 @@ const NewPatientForm: React.FC = () => {
             <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-8 border border-slate-700/50">
               <h2 className="text-2xl font-bold text-white mb-4 text-center">Como deseja cadastrar os pacientes?</h2>
               <p className="text-slate-400 text-center mb-8">Escolha o método mais adequado para seu caso</p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Opção 1: Cadastro Manual */}
                 <button
@@ -792,6 +792,7 @@ const NewPatientForm: React.FC = () => {
                       <p className="mt-2">Colunas recomendadas: <span className="font-mono text-xs bg-slate-800 px-2 py-1 rounded">nome, cpf, email, telefone, data_nascimento, sexo</span></p>
                     </div>
                   </div>
+                </div>
               </div>
             </div>
           </div>
@@ -809,11 +810,10 @@ const NewPatientForm: React.FC = () => {
                 <div key={s.num} className="flex items-center flex-1">
                   <div className="flex flex-col items-center flex-1">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
-                        step >= s.num
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-slate-700 text-slate-400'
-                      }`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${step >= s.num
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-slate-700 text-slate-400'
+                        }`}
                     >
                       {step > s.num ? <CheckCircle className="w-5 h-5" /> : s.num}
                     </div>
@@ -852,767 +852,764 @@ const NewPatientForm: React.FC = () => {
         {mode !== null && (
           <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700/50 mb-6">
             {mode === 'manual' && (
-            <>
-              {step === 1 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">Informações Pessoais</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Nome Completo *
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="Digite o nome completo"
-                  />
-                </div>
+              <>
+                {step === 1 && (
+                  <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-white mb-6">Informações Pessoais</h2>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    CPF
-                  </label>
-                  <input
-                    type="text"
-                    name="cpf"
-                    value={formData.cpf}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="000.000.000-00 (opcional)"
-                  />
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Nome Completo *
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="Digite o nome completo"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="paciente@email.com"
-                    required
-                  />
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          CPF
+                        </label>
+                        <input
+                          type="text"
+                          name="cpf"
+                          value={formData.cpf}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="000.000.000-00 (opcional)"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Telefone
-                  </label>
-                  <input
-                    type="text"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="(21) 99999-9999 (opcional)"
-                  />
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="paciente@email.com"
+                          required
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Data de Nascimento
-                  </label>
-                  <input
-                    type="date"
-                    name="birthDate"
-                    value={formData.birthDate}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Telefone
+                        </label>
+                        <input
+                          type="text"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="(21) 99999-9999 (opcional)"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Sexo
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="">Selecione</option>
-                    <option value="masculino">Masculino</option>
-                    <option value="feminino">Feminino</option>
-                    <option value="outro">Outro</option>
-                  </select>
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Data de Nascimento
+                        </label>
+                        <input
+                          type="date"
+                          name="birthDate"
+                          value={formData.birthDate}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Endereço
-                  </label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="Rua, número, complemento"
-                  />
-                </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Sexo
+                        </label>
+                        <select
+                          name="gender"
+                          value={formData.gender}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <option value="">Selecione</option>
+                          <option value="masculino">Masculino</option>
+                          <option value="feminino">Feminino</option>
+                          <option value="outro">Outro</option>
+                        </select>
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Cidade
-                  </label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="Nome da cidade"
-                  />
-                </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Endereço
+                        </label>
+                        <input
+                          type="text"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="Rua, número, complemento"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Estado
-                  </label>
-                  <input
-                    type="text"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                    placeholder="UF"
-                    maxLength={2}
-                  />
-                </div>
-              </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Cidade
+                        </label>
+                        <input
+                          type="text"
+                          name="city"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="Nome da cidade"
+                        />
+                      </div>
 
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => navigate('/app/patients')}
-                  className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => setStep(2)}
-                  disabled={!isStep1Valid}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Próximo
-                </button>
-              </div>
-            </div>
-          )}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Estado
+                        </label>
+                        <input
+                          type="text"
+                          name="state"
+                          value={formData.state}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                          placeholder="UF"
+                          maxLength={2}
+                        />
+                      </div>
+                    </div>
 
-          {step === 2 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">Informações de Atendimento</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Profissional Responsável *
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {professionals.map(prof => (
+                    <div className="flex justify-end space-x-4">
                       <button
-                        key={prof.id}
-                        type="button"
-                        onClick={() => {
-                          console.log('🔍 Selecionando profissional:', prof.id)
-                          setFormData(prev => ({ ...prev, professionalId: prof.id }))
-                          console.log('🔍 ProfessionalId atualizado:', prof.id)
-                        }}
-                        className={`p-4 rounded-lg border-2 transition-all text-left ${
-                          formData.professionalId === prof.id
-                            ? 'border-blue-500 bg-blue-500/10'
-                            : 'border-slate-700 bg-slate-700/50 hover:border-slate-600'
-                        }`}
+                        onClick={() => navigate('/app/patients')}
+                        className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
                       >
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-white">{prof.name}</p>
-                            <p className="text-xs text-slate-400">{prof.crm}</p>
-                          </div>
-                        </div>
-                        <p className="text-sm text-slate-300">{prof.specialty}</p>
+                        Cancelar
                       </button>
-                    ))}
+                      <button
+                        onClick={() => setStep(2)}
+                        disabled={!isStep1Valid}
+                        className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Próximo
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-white mb-6">Informações de Atendimento</h2>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Profissional Responsável *
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {professionals.map(prof => (
+                            <button
+                              key={prof.id}
+                              type="button"
+                              onClick={() => {
+                                console.log('🔍 Selecionando profissional:', prof.id)
+                                setFormData(prev => ({ ...prev, professionalId: prof.id }))
+                                console.log('🔍 ProfessionalId atualizado:', prof.id)
+                              }}
+                              className={`p-4 rounded-lg border-2 transition-all text-left ${formData.professionalId === prof.id
+                                ? 'border-blue-500 bg-blue-500/10'
+                                : 'border-slate-700 bg-slate-700/50 hover:border-slate-600'
+                                }`}
+                            >
+                              <div className="flex items-center space-x-3 mb-2">
+                                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+                                  <User className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-white">{prof.name}</p>
+                                  <p className="text-xs text-slate-400">{prof.crm}</p>
+                                </div>
+                              </div>
+                              <p className="text-sm text-slate-300">{prof.specialty}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Especialidade *
+                          </label>
+                          <select
+                            name="specialty"
+                            value={formData.specialty}
+                            onChange={(e) => {
+                              console.log('🔍 Selecionando especialidade:', e.target.value)
+                              handleInputChange(e)
+                              console.log('🔍 Specialty atualizado:', e.target.value)
+                            }}
+                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                          >
+                            <option value="">Selecione</option>
+                            {specialties.map(spec => (
+                              <option key={spec} value={spec}>{spec}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Sala
+                          </label>
+                          <select
+                            name="room"
+                            value={formData.room}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                          >
+                            <option value="Indiferente">Indiferente</option>
+                            <option value="Sala 1">Sala 1</option>
+                            <option value="Sala 2">Sala 2</option>
+                            <option value="Sala 3">Sala 3</option>
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Médico Encaminhador
+                          </label>
+                          <input
+                            type="text"
+                            name="referringDoctor"
+                            value={formData.referringDoctor}
+                            onChange={handleInputChange}
+                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                            placeholder="Nome do médico que encaminhou (opcional)"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Observações Iniciais
+                          </label>
+                          <textarea
+                            name="observations"
+                            value={formData.observations}
+                            onChange={handleInputChange}
+                            rows={4}
+                            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                            placeholder="Observações iniciais sobre o paciente..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-4">
+                      <button
+                        onClick={() => setStep(1)}
+                        className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                      >
+                        Voltar
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.log('🔍 Debug Step 2:', {
+                            professionalId: formData.professionalId,
+                            specialty: formData.specialty,
+                            isStep2Valid,
+                            formData
+                          })
+                          if (isStep2Valid) {
+                            setStep(3)
+                          } else {
+                            alert('Por favor, selecione um Profissional Responsável e uma Especialidade.')
+                          }
+                        }}
+                        disabled={!isStep2Valid}
+                        className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Próximo
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 3 && (
+                  <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-white mb-6">Upload de Documentos</h2>
+
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6">
+                      <div className="flex items-start space-x-3">
+                        <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5" />
+                        <div className="text-sm text-slate-300">
+                          <p className="font-semibold text-white mb-1">Importação de Arquivos em Lote</p>
+                          <p>Você pode arrastar e soltar ou selecionar múltiplos arquivos (PDFs, DOCs, imagens, etc.) para importação rápida.</p>
+                          <p className="mt-2">Arquivos aceitos: PDF, DOC, DOCX, JPG, PNG, DICOM</p>
+                          <p className="mt-2 text-yellow-400">Importante: Este cadastro é destinado a profissionais. Pacientes devem ser direcionados ao agendamento.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Upload Area */}
+                    <div
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={handleDrop}
+                      className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${dragActive
+                        ? 'border-blue-500 bg-blue-500/10'
+                        : 'border-slate-700 bg-slate-700/30 hover:border-slate-600'
+                        }`}
+                    >
+                      <Upload className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-blue-400' : 'text-slate-400'}`} />
+                      <p className="text-lg font-semibold text-white mb-2">
+                        Arraste arquivos aqui ou clique para selecionar
+                      </p>
+                      <p className="text-sm text-slate-400 mb-4">
+                        Suporta múltiplos arquivos (anemneses, exames, imagens, etc.)
+                      </p>
+                      <label className="inline-block px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-colors cursor-pointer">
+                        Selecionar Arquivos
+                        <input
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => handleFileUpload(e.target.files)}
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dcm"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Uploaded Files */}
+                    {uploadedFiles.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-lg font-semibold text-white">Arquivos Anexados ({uploadedFiles.length})</h3>
+                        <div className="space-y-2">
+                          {uploadedFiles.map((file) => (
+                            <div
+                              key={file.id}
+                              className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg border border-slate-600"
+                            >
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                {file.preview ? (
+                                  <img src={file.preview} alt={file.name} className="w-10 h-10 rounded object-cover" />
+                                ) : (
+                                  <div className="w-10 h-10 bg-slate-600 rounded flex items-center justify-center">
+                                    {getFileIcon(file.type)}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                                  <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => removeFile(file.id)}
+                                className="p-2 text-red-400 hover:text-red-300 transition-colors"
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end space-x-4">
+                      <button
+                        onClick={() => setStep(2)}
+                        className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                      >
+                        Voltar
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.log('🖱️ Botão Salvar clicado!', { formData, isSubmitting })
+                          handleSubmit()
+                        }}
+                        disabled={isSubmitting}
+                        className="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Salvando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-5 h-5" />
+                            <span>Salvar Paciente</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Modo CSV */}
+            {mode === 'csv' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Download className="w-6 h-6 text-green-400" />
+                  <span>Importar Pacientes em Massa</span>
+                </h2>
+
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-slate-300">
+                      <p className="font-semibold text-white mb-2">Formatos Suportados</p>
+                      <p className="mb-2">✅ <strong>CSV</strong> (.csv)</p>
+                      <p className="mb-2">✅ <strong>Excel</strong> (.xlsx, .xls)</p>
+                      <p className="mb-2">✅ <strong>Apollo/Ninsaúde</strong> - Exporte sua planilha de pacientes</p>
+                      <p className="mb-2">✅ <strong>Rio Bonito</strong> - Planilhas da clínica</p>
+                      <p className="mt-3 text-yellow-400 font-semibold">📋 Colunas Recomendadas:</p>
+                      <p className="text-xs font-mono bg-slate-800 px-2 py-1 rounded mt-1">
+                        nome, cpf, email, telefone, data_nascimento, sexo, endereco, cidade, estado, cep
+                      </p>
+                      <p className="mt-2 text-green-400">💡 <strong>Dica:</strong> O sistema reconhece automaticamente diferentes nomes de colunas (ex: "Nome do Paciente", "CPF", etc.)</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Especialidade *
-                    </label>
-                    <select
-                      name="specialty"
-                      value={formData.specialty}
-                      onChange={(e) => {
-                        console.log('🔍 Selecionando especialidade:', e.target.value)
-                        handleInputChange(e)
-                        console.log('🔍 Specialty atualizado:', e.target.value)
-                      }}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="">Selecione</option>
-                      {specialties.map(spec => (
-                        <option key={spec} value={spec}>{spec}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Sala
-                    </label>
-                    <select
-                      name="room"
-                      value={formData.room}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="Indiferente">Indiferente</option>
-                      <option value="Sala 1">Sala 1</option>
-                      <option value="Sala 2">Sala 2</option>
-                      <option value="Sala 3">Sala 3</option>
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Médico Encaminhador
-                    </label>
-                    <input
-                      type="text"
-                      name="referringDoctor"
-                      value={formData.referringDoctor}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                      placeholder="Nome do médico que encaminhou (opcional)"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Observações Iniciais
-                    </label>
-                    <textarea
-                      name="observations"
-                      value={formData.observations}
-                      onChange={handleInputChange}
-                      rows={4}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                      placeholder="Observações iniciais sobre o paciente..."
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => setStep(1)}
-                  className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-                >
-                  Voltar
-                </button>
-                <button
-                  onClick={() => {
-                    console.log('🔍 Debug Step 2:', {
-                      professionalId: formData.professionalId,
-                      specialty: formData.specialty,
-                      isStep2Valid,
-                      formData
-                    })
-                    if (isStep2Valid) {
-                      setStep(3)
-                    } else {
-                      alert('Por favor, selecione um Profissional Responsável e uma Especialidade.')
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDragActive(false)
+                    const files = e.dataTransfer.files
+                    if (files.length > 0) {
+                      const fileName = files[0].name.toLowerCase()
+                      if (fileName.endsWith('.csv') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                        handleSpreadsheetUpload(files[0])
+                      } else {
+                        alert('Formato não suportado. Use arquivos CSV ou Excel (.xlsx, .xls)')
+                      }
                     }
                   }}
-                  disabled={!isStep2Valid}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${dragActive
+                    ? 'border-green-500 bg-green-500/10'
+                    : 'border-slate-700 bg-slate-700/30 hover:border-slate-600'
+                    }`}
                 >
-                  Próximo
-                </button>
-              </div>
-            </div>
-          )}
+                  <Download className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-green-400' : 'text-slate-400'}`} />
+                  <p className="text-lg font-semibold text-white mb-2">
+                    Arraste sua planilha aqui ou clique para selecionar
+                  </p>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Suporta CSV e Excel (Apollo/Ninsaúde, Rio Bonito, etc.)
+                  </p>
+                  <label className="inline-block px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors cursor-pointer">
+                    Selecionar Planilha
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleSpreadsheetUpload(e.target.files[0])
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
 
-          {step === 3 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6">Upload de Documentos</h2>
-              
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6">
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5" />
-                  <div className="text-sm text-slate-300">
-                    <p className="font-semibold text-white mb-1">Importação de Arquivos em Lote</p>
-                    <p>Você pode arrastar e soltar ou selecionar múltiplos arquivos (PDFs, DOCs, imagens, etc.) para importação rápida.</p>
-                    <p className="mt-2">Arquivos aceitos: PDF, DOC, DOCX, JPG, PNG, DICOM</p>
-                    <p className="mt-2 text-yellow-400">Importante: Este cadastro é destinado a profissionais. Pacientes devem ser direcionados ao agendamento.</p>
+                {csvData.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-bold text-white mb-4">
+                      {csvData.length} paciente(s) encontrado(s)
+                    </h3>
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                      {csvData.map((patient, idx) => (
+                        <div key={idx} className="p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+                          <p className="font-semibold text-white">{patient.nome || 'Sem nome'}</p>
+                          <p className="text-sm text-slate-400">CPF: {patient.cpf || 'N/A'} • Telefone: {patient.telefone || 'N/A'}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleBulkSubmit}
+                      disabled={isSubmitting}
+                      className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Importando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-5 h-5" />
+                          <span>Importar {csvData.length} paciente(s)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Modo Database */}
+            {mode === 'database' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Database className="w-6 h-6 text-purple-400" />
+                  <span>Importar do Banco de Dados</span>
+                </h2>
+
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 mb-6">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-purple-400 mt-0.5" />
+                    <div className="text-sm text-slate-300">
+                      <p className="font-semibold text-white mb-1">Conexão Externa</p>
+                      <p>Configure a conexão com o banco de dados externo para importar pacientes.</p>
+                      <p className="mt-2 text-yellow-400">Importante: As credenciais não são armazenadas permanentemente.</p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Upload Area */}
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
-                  dragActive
-                    ? 'border-blue-500 bg-blue-500/10'
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Host / Endereço *
+                      </label>
+                      <input
+                        type="text"
+                        value={dbConfig.host}
+                        onChange={(e) => setDbConfig(prev => ({ ...prev, host: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                        placeholder="localhost ou IP"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Porta *
+                      </label>
+                      <input
+                        type="text"
+                        value={dbConfig.port}
+                        onChange={(e) => setDbConfig(prev => ({ ...prev, port: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                        placeholder="5432"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Nome do Banco *
+                      </label>
+                      <input
+                        type="text"
+                        value={dbConfig.database}
+                        onChange={(e) => setDbConfig(prev => ({ ...prev, database: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                        placeholder="nome_banco"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Tabela de Pacientes *
+                      </label>
+                      <input
+                        type="text"
+                        value={dbConfig.table}
+                        onChange={(e) => setDbConfig(prev => ({ ...prev, table: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                        placeholder="pacientes ou users"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Usuário *
+                      </label>
+                      <input
+                        type="text"
+                        value={dbConfig.username}
+                        onChange={(e) => setDbConfig(prev => ({ ...prev, username: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                        placeholder="usuario"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Senha *
+                      </label>
+                      <input
+                        type="password"
+                        value={dbConfig.password}
+                        onChange={(e) => setDbConfig(prev => ({ ...prev, password: e.target.value }))}
+                        className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                        placeholder="••••••••"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleDatabaseImport}
+                    disabled={!dbConfig.host || !dbConfig.database || !dbConfig.table || !dbConfig.username || !dbConfig.password || isSubmitting}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Conectando e importando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-5 h-5" />
+                        <span>Conectar e Importar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modo Drag-Drop */}
+            {mode === 'drag-drop' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Database className="w-6 h-6 text-cyan-400" />
+                  <span>Arrastar e Soltar Arquivos</span>
+                </h2>
+
+                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-6">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-cyan-400 mt-0.5" />
+                    <div className="text-sm text-slate-300">
+                      <p className="font-semibold text-white mb-1">Importação em Lote</p>
+                      <p>Arraste múltiplos arquivos (PDFs, DOCs, imagens, etc.) para processar automaticamente.</p>
+                      <p className="mt-2">Arquivos aceitos: PDF, DOC, DOCX, JPG, PNG, DICOM, CSV, XLSX</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDragActive(false)
+                    if (e.dataTransfer.files) {
+                      handleFileUpload(e.dataTransfer.files)
+                      setDragDropFiles(Array.from(e.dataTransfer.files).map(file => ({
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        file: file
+                      })))
+                    }
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${dragActive
+                    ? 'border-cyan-500 bg-cyan-500/10'
                     : 'border-slate-700 bg-slate-700/30 hover:border-slate-600'
-                }`}
-              >
-                <Upload className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-blue-400' : 'text-slate-400'}`} />
-                <p className="text-lg font-semibold text-white mb-2">
-                  Arraste arquivos aqui ou clique para selecionar
-                </p>
-                <p className="text-sm text-slate-400 mb-4">
-                  Suporta múltiplos arquivos (anemneses, exames, imagens, etc.)
-                </p>
-                <label className="inline-block px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-colors cursor-pointer">
-                  Selecionar Arquivos
-                  <input
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e.target.files)}
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dcm"
-                  />
-                </label>
-              </div>
+                    }`}
+                >
+                  <Upload className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                  <p className="text-lg font-semibold text-white mb-2">
+                    Arraste arquivos aqui ou clique para selecionar
+                  </p>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Você pode arrastar múltiplos arquivos de uma vez
+                  </p>
+                  <label className="inline-block px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors cursor-pointer">
+                    Selecionar Arquivos
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          handleFileUpload(e.target.files)
+                          setDragDropFiles(Array.from(e.target.files).map(file => ({
+                            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                            name: file.name,
+                            type: file.type,
+                            size: file.size,
+                            file: file
+                          })))
+                        }
+                      }}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dcm,.csv,.xlsx"
+                    />
+                  </label>
+                </div>
 
-              {/* Uploaded Files */}
-              {uploadedFiles.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-white">Arquivos Anexados ({uploadedFiles.length})</h3>
-                  <div className="space-y-2">
-                    {uploadedFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg border border-slate-600"
-                      >
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          {file.preview ? (
-                            <img src={file.preview} alt={file.name} className="w-10 h-10 rounded object-cover" />
-                          ) : (
+                {dragDropFiles.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-bold text-white mb-4">
+                      {dragDropFiles.length} arquivo(s) selecionado(s)
+                    </h3>
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                      {dragDropFiles.map((file) => (
+                        <div
+                          key={file.id}
+                          className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg border border-slate-600"
+                        >
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
                             <div className="w-10 h-10 bg-slate-600 rounded flex items-center justify-center">
                               {getFileIcon(file.type)}
                             </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                            <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                              <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
+                            </div>
                           </div>
+                          <button
+                            onClick={() => setDragDropFiles(prev => prev.filter(f => f.id !== file.id))}
+                            className="p-2 text-red-400 hover:text-red-300 transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeFile(file.id)}
-                          className="p-2 text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <button
+                      onClick={handleDragDropProcess}
+                      disabled={isSubmitting}
+                      className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-5 h-5" />
+                          <span>Processar {dragDropFiles.length} arquivo(s)</span>
+                        </>
+                      )}
+                    </button>
                   </div>
-                </div>
-              )}
-
-              <div className="flex justify-end space-x-4">
-                <button
-                  onClick={() => setStep(2)}
-                  className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-                >
-                  Voltar
-                </button>
-                <button
-                  onClick={() => {
-                    console.log('🖱️ Botão Salvar clicado!', { formData, isSubmitting })
-                    handleSubmit()
-                  }}
-                  disabled={isSubmitting}
-                  className="px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Salvando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Salvar Paciente</span>
-                    </>
-                  )}
-                </button>
+                )}
               </div>
-            </div>
-          )}
-            </>
-          )}
-
-          {/* Modo CSV */}
-          {mode === 'csv' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <Download className="w-6 h-6 text-green-400" />
-                <span>Importar Pacientes em Massa</span>
-              </h2>
-
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-6">
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-slate-300">
-                    <p className="font-semibold text-white mb-2">Formatos Suportados</p>
-                    <p className="mb-2">✅ <strong>CSV</strong> (.csv)</p>
-                    <p className="mb-2">✅ <strong>Excel</strong> (.xlsx, .xls)</p>
-                    <p className="mb-2">✅ <strong>Apollo/Ninsaúde</strong> - Exporte sua planilha de pacientes</p>
-                    <p className="mb-2">✅ <strong>Rio Bonito</strong> - Planilhas da clínica</p>
-                    <p className="mt-3 text-yellow-400 font-semibold">📋 Colunas Recomendadas:</p>
-                    <p className="text-xs font-mono bg-slate-800 px-2 py-1 rounded mt-1">
-                      nome, cpf, email, telefone, data_nascimento, sexo, endereco, cidade, estado, cep
-                    </p>
-                    <p className="mt-2 text-green-400">💡 <strong>Dica:</strong> O sistema reconhece automaticamente diferentes nomes de colunas (ex: "Nome do Paciente", "CPF", etc.)</p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setDragActive(false)
-                  const files = e.dataTransfer.files
-                  if (files.length > 0) {
-                    const fileName = files[0].name.toLowerCase()
-                    if (fileName.endsWith('.csv') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-                      handleSpreadsheetUpload(files[0])
-                    } else {
-                      alert('Formato não suportado. Use arquivos CSV ou Excel (.xlsx, .xls)')
-                    }
-                  }
-                }}
-                className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
-                  dragActive
-                    ? 'border-green-500 bg-green-500/10'
-                    : 'border-slate-700 bg-slate-700/30 hover:border-slate-600'
-                }`}
-              >
-                <Download className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-green-400' : 'text-slate-400'}`} />
-                <p className="text-lg font-semibold text-white mb-2">
-                  Arraste sua planilha aqui ou clique para selecionar
-                </p>
-                <p className="text-sm text-slate-400 mb-4">
-                  Suporta CSV e Excel (Apollo/Ninsaúde, Rio Bonito, etc.)
-                </p>
-                <label className="inline-block px-6 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors cursor-pointer">
-                  Selecionar Planilha
-                  <input
-                    type="file"
-                    accept=".csv,.xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleSpreadsheetUpload(e.target.files[0])
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-
-              {csvData.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-bold text-white mb-4">
-                    {csvData.length} paciente(s) encontrado(s)
-                  </h3>
-                  <div className="max-h-96 overflow-y-auto space-y-2">
-                    {csvData.map((patient, idx) => (
-                      <div key={idx} className="p-3 bg-slate-700/50 rounded-lg border border-slate-600">
-                        <p className="font-semibold text-white">{patient.nome || 'Sem nome'}</p>
-                        <p className="text-sm text-slate-400">CPF: {patient.cpf || 'N/A'} • Telefone: {patient.telefone || 'N/A'}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={handleBulkSubmit}
-                    disabled={isSubmitting}
-                    className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:from-green-600 hover:to-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Importando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        <span>Importar {csvData.length} paciente(s)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Modo Database */}
-          {mode === 'database' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <Database className="w-6 h-6 text-purple-400" />
-                <span>Importar do Banco de Dados</span>
-              </h2>
-
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 mb-6">
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-purple-400 mt-0.5" />
-                  <div className="text-sm text-slate-300">
-                    <p className="font-semibold text-white mb-1">Conexão Externa</p>
-                    <p>Configure a conexão com o banco de dados externo para importar pacientes.</p>
-                    <p className="mt-2 text-yellow-400">Importante: As credenciais não são armazenadas permanentemente.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Host / Endereço *
-                    </label>
-                    <input
-                      type="text"
-                      value={dbConfig.host}
-                      onChange={(e) => setDbConfig(prev => ({ ...prev, host: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                      placeholder="localhost ou IP"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Porta *
-                    </label>
-                    <input
-                      type="text"
-                      value={dbConfig.port}
-                      onChange={(e) => setDbConfig(prev => ({ ...prev, port: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                      placeholder="5432"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Nome do Banco *
-                    </label>
-                    <input
-                      type="text"
-                      value={dbConfig.database}
-                      onChange={(e) => setDbConfig(prev => ({ ...prev, database: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                      placeholder="nome_banco"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Tabela de Pacientes *
-                    </label>
-                    <input
-                      type="text"
-                      value={dbConfig.table}
-                      onChange={(e) => setDbConfig(prev => ({ ...prev, table: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                      placeholder="pacientes ou users"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Usuário *
-                    </label>
-                    <input
-                      type="text"
-                      value={dbConfig.username}
-                      onChange={(e) => setDbConfig(prev => ({ ...prev, username: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                      placeholder="usuario"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Senha *
-                    </label>
-                    <input
-                      type="password"
-                      value={dbConfig.password}
-                      onChange={(e) => setDbConfig(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleDatabaseImport}
-                  disabled={!dbConfig.host || !dbConfig.database || !dbConfig.table || !dbConfig.username || !dbConfig.password || isSubmitting}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Conectando e importando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Database className="w-5 h-5" />
-                      <span>Conectar e Importar</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Modo Drag-Drop */}
-          {mode === 'drag-drop' && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
-                <Database className="w-6 h-6 text-cyan-400" />
-                <span>Arrastar e Soltar Arquivos</span>
-              </h2>
-
-              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-6">
-                <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-5 h-5 text-cyan-400 mt-0.5" />
-                  <div className="text-sm text-slate-300">
-                    <p className="font-semibold text-white mb-1">Importação em Lote</p>
-                    <p>Arraste múltiplos arquivos (PDFs, DOCs, imagens, etc.) para processar automaticamente.</p>
-                    <p className="mt-2">Arquivos aceitos: PDF, DOC, DOCX, JPG, PNG, DICOM, CSV, XLSX</p>
-                  </div>
-                </div>
-              </div>
-
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setDragActive(false)
-                  if (e.dataTransfer.files) {
-                    handleFileUpload(e.dataTransfer.files)
-                    setDragDropFiles(Array.from(e.dataTransfer.files).map(file => ({
-                      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                      name: file.name,
-                      type: file.type,
-                      size: file.size,
-                      file: file
-                    })))
-                  }
-                }}
-                className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
-                  dragActive
-                    ? 'border-cyan-500 bg-cyan-500/10'
-                    : 'border-slate-700 bg-slate-700/30 hover:border-slate-600'
-                }`}
-              >
-                <Upload className={`w-12 h-12 mx-auto mb-4 ${dragActive ? 'text-cyan-400' : 'text-slate-400'}`} />
-                <p className="text-lg font-semibold text-white mb-2">
-                  Arraste arquivos aqui ou clique para selecionar
-                </p>
-                <p className="text-sm text-slate-400 mb-4">
-                  Você pode arrastar múltiplos arquivos de uma vez
-                </p>
-                <label className="inline-block px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors cursor-pointer">
-                  Selecionar Arquivos
-                  <input
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files) {
-                        handleFileUpload(e.target.files)
-                        setDragDropFiles(Array.from(e.target.files).map(file => ({
-                          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                          name: file.name,
-                          type: file.type,
-                          size: file.size,
-                          file: file
-                        })))
-                      }
-                    }}
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dcm,.csv,.xlsx"
-                  />
-                </label>
-              </div>
-
-              {dragDropFiles.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-bold text-white mb-4">
-                    {dragDropFiles.length} arquivo(s) selecionado(s)
-                  </h3>
-                  <div className="max-h-96 overflow-y-auto space-y-2">
-                    {dragDropFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg border border-slate-600"
-                      >
-                        <div className="flex items-center space-x-3 flex-1 min-w-0">
-                          <div className="w-10 h-10 bg-slate-600 rounded flex items-center justify-center">
-                            {getFileIcon(file.type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                            <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setDragDropFiles(prev => prev.filter(f => f.id !== file.id))}
-                          className="p-2 text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={handleDragDropProcess}
-                    disabled={isSubmitting}
-                    className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Processando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        <span>Processar {dragDropFiles.length} arquivo(s)</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+            )}
           </div>
-        )}
         </div>
-      </div>
     </div>
+    </div >
+  )
+}
   )
 }
 

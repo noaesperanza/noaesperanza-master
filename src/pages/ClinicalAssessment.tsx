@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { 
-  Stethoscope, 
-  FileText, 
-  Clock, 
-  CheckCircle, 
+import {
+  Stethoscope,
+  FileText,
+  Clock,
+  CheckCircle,
   AlertCircle,
   User,
   Heart,
@@ -16,6 +16,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { NoaResidentAI } from '../lib/noaResidentAI'
 import ShareAssessment from '../components/ShareAssessment'
 
 const ClinicalAssessment: React.FC = () => {
@@ -135,32 +136,50 @@ const ClinicalAssessment: React.FC = () => {
     if (!user) return
 
     setIsGeneratingReport(true)
-    
+
     try {
       console.log('🚀 Iniciando processo completo de relatório...')
 
-      // 1. GERAR RELATÓRIO CLÍNICO COMPLETO
-      console.log('📋 Gerando relatório clínico...')
+      // 1. GERAR RELATÓRIO CLÍNICO COMPLETO (DINÂMICO)
+      console.log('📋 Gerando relatório clínico dinâmico...')
+
+      // Instanciar a IA Residente
+      const noaAI = new NoaResidentAI()
+
+      // Gerar resumo baseado nos dados reais da avaliação
+      let dynamicSummary = await noaAI.generateClinicalSummary(user.id)
+
+      // Fallback visual se a geração falhar ou retornar null
+      if (!dynamicSummary) {
+        console.warn('⚠️ Falha ao gerar resumo dinâmico, usando dados base.')
+        dynamicSummary = {
+          emotionalAxis: { intensity: 5, valence: 5, arousal: 5, stability: 5 },
+          cognitiveAxis: { attention: 5, memory: 5, executive: 5, processing: 5 },
+          behavioralAxis: { activity: 5, social: 5, adaptive: 5, regulatory: 5 },
+          clinicalData: {
+            renalFunction: { creatinine: 1.0, gfr: 90, stage: 'normal' },
+            cannabisMetabolism: { cyp2c9: 'normal', cyp3a4: 'normal', metabolismRate: 1.0 }
+          },
+          correlations: {
+            imreClinicalCorrelations: { emotionalRenalCorrelation: 0.5 },
+            riskAssessment: { overallRisk: 0.1, renalRisk: 0.1 }
+          },
+          recommendations: [
+            'Realizar acompanhamento regular',
+            'Avaliação detalhada necessária'
+          ]
+        }
+      }
+
       const reportData = {
         imreData: {
-          emotionalAxis: { intensity: 7, valence: 6, arousal: 5, stability: 8 },
-          cognitiveAxis: { attention: 7, memory: 6, executive: 7, processing: 6 },
-          behavioralAxis: { activity: 6, social: 7, adaptive: 8, regulatory: 7 }
+          emotionalAxis: dynamicSummary.emotionalAxis,
+          cognitiveAxis: dynamicSummary.cognitiveAxis,
+          behavioralAxis: dynamicSummary.behavioralAxis
         },
-        clinicalData: {
-          renalFunction: { creatinine: 1.2, gfr: 85, stage: 'normal' },
-          cannabisMetabolism: { cyp2c9: 'normal', cyp3a4: 'normal', metabolismRate: 1.0 }
-        },
-        correlations: {
-          imreClinicalCorrelations: { emotionalRenalCorrelation: 0.7 },
-          riskAssessment: { overallRisk: 0.3, renalRisk: 0.2 }
-        },
-        recommendations: [
-          'Acompanhamento médico regular',
-          'Monitoramento de função renal',
-          'Avaliação de fatores de risco',
-          'Orientação sobre cannabis medicinal'
-        ]
+        clinicalData: dynamicSummary.clinicalData,
+        correlations: dynamicSummary.correlations,
+        recommendations: dynamicSummary.recommendations
       }
 
       // Salvar na tabela clinical_assessments
@@ -182,7 +201,7 @@ const ClinicalAssessment: React.FC = () => {
       // 2. MINTAR NFT DO RELATÓRIO
       console.log('🎨 Mintando NFT do relatório...')
       await new Promise(resolve => setTimeout(resolve, 1500)) // Simular mint NFT
-      
+
       const nftData = {
         tokenId: `#${Math.floor(Math.random() * 10000)}`,
         contractAddress: '0x1234567890123456789012345678901234567890',
@@ -194,7 +213,7 @@ const ClinicalAssessment: React.FC = () => {
       // 3. SALVAR NO PRONTUÁRIO DO PACIENTE
       console.log('📁 Salvando no prontuário do paciente...')
       await new Promise(resolve => setTimeout(resolve, 1000))
-      
+
       // Salvar na tabela imre_assessments para o paciente
       const { error: patientError } = await supabase
         .from('imre_assessments')
@@ -213,7 +232,7 @@ const ClinicalAssessment: React.FC = () => {
 
       // 4. SALVAR NO PRONTUÁRIO DO PROFISSIONAL
       console.log('📁 Salvando no prontuário do profissional...')
-      
+
       // Salvar na tabela clinical_integration
       const { error: professionalError } = await supabase
         .from('clinical_integration')
@@ -235,7 +254,7 @@ const ClinicalAssessment: React.FC = () => {
       console.log('📋 Relatório ID:', assessment.id)
       console.log('🎨 NFT Token ID:', nftData.tokenId)
       console.log('📁 Salvo nos prontuários do paciente e profissional')
-      
+
     } catch (error) {
       console.error('❌ Erro no processo:', error)
     } finally {
@@ -328,7 +347,7 @@ const ClinicalAssessment: React.FC = () => {
                   ✕
                 </button>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -439,7 +458,7 @@ const ClinicalAssessment: React.FC = () => {
               Complete o processo completo: Relatório → NFT → Prontuários
             </p>
           </div>
-          
+
           {/* Status do Processo */}
           <div className="mb-6 space-y-3">
             <div className={`flex items-center space-x-3 p-3 rounded-lg ${reportGenerated ? 'bg-green-500/30' : 'bg-white/10'}`}>
@@ -448,14 +467,14 @@ const ClinicalAssessment: React.FC = () => {
               </div>
               <span className="text-sm">Relatório Clínico Gerado</span>
             </div>
-            
+
             <div className={`flex items-center space-x-3 p-3 rounded-lg ${nftMinted ? 'bg-green-500/30' : 'bg-white/10'}`}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${nftMinted ? 'bg-green-500' : 'bg-white/30'}`}>
                 {nftMinted ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">2</span>}
               </div>
               <span className="text-sm">NFT Registrado</span>
             </div>
-            
+
             <div className={`flex items-center space-x-3 p-3 rounded-lg ${savedToRecords ? 'bg-green-500/30' : 'bg-white/10'}`}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center ${savedToRecords ? 'bg-green-500' : 'bg-white/30'}`}>
                 {savedToRecords ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">3</span>}
@@ -463,7 +482,7 @@ const ClinicalAssessment: React.FC = () => {
               <span className="text-sm">Salvo nos Prontuários</span>
             </div>
           </div>
-          
+
           {/* Botão Principal */}
           <div className="text-center">
             <button
@@ -484,7 +503,7 @@ const ClinicalAssessment: React.FC = () => {
               )}
             </button>
           </div>
-          
+
           {/* Botões Secundários */}
           {savedToRecords && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
@@ -495,12 +514,12 @@ const ClinicalAssessment: React.FC = () => {
                 <Activity className="w-5 h-5" />
                 <span>Compartilhar</span>
               </button>
-              
+
               <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
                 <Download className="w-5 h-5" />
                 <span>Baixar PDF</span>
               </button>
-              
+
               <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
                 <Share2 className="w-5 h-5" />
                 <span>Enviar Email</span>

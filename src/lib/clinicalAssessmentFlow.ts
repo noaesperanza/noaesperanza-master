@@ -571,3 +571,6 @@ export class ClinicalAssessmentFlow {
 // Instância singleton
 export const clinicalAssessmentFlow = new ClinicalAssessmentFlow()
 
+
+
+

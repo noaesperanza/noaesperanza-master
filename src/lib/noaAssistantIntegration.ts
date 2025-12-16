@@ -36,7 +36,7 @@ export class NoaAssistantIntegration {
       apiKey: config.apiKey || (import.meta as any).env?.VITE_OPENAI_API_KEY || '',
       timeout: config.timeout || 30000
     }
-    
+
     // Inicializar sistema de comandos
     this.commandSystem = new NoaCommandSystem(this, getPatientDashboardAPI())
   }
@@ -51,7 +51,8 @@ export class NoaAssistantIntegration {
   ): Promise<MessageResponse> {
     // Tentar usar Assistant API primeiro
     try {
-      const assistantResponse = await this.tryAssistantAPI(message)
+      // Usar userCode como contexto/instruções adicionais se disponível
+      const assistantResponse = await this.tryAssistantAPI(message, userCode)
       return {
         content: assistantResponse,
         from: 'assistant',
@@ -63,7 +64,7 @@ export class NoaAssistantIntegration {
     } catch (error) {
       console.warn('Assistant API não disponível, usando fallback local:', error)
       console.info('Verifique se VITE_OPENAI_API_KEY está definido com uma chave válida e se o assistant tem acesso aos arquivos necessários.')
-      
+
       // Fallback para sistema local
       return this.useLocalFallback(message, userCode, currentRoute)
     }
@@ -72,7 +73,7 @@ export class NoaAssistantIntegration {
   /**
    * Tentar usar Assistant API
    */
-  private async tryAssistantAPI(message: string): Promise<string> {
+  private async tryAssistantAPI(message: string, context?: string): Promise<string> {
     if (!this.config.apiKey || this.config.apiKey === '') {
       throw new Error('API Key não configurada')
     }
@@ -86,15 +87,15 @@ export class NoaAssistantIntegration {
       // Adicionar mensagem à thread
       await this.addMessageToThread(message)
 
-      // Executar assistant
-      const runId = await this.runAssistant()
+      // Executar assistant com instruções adicionais (contexto)
+      const runId = await this.runAssistant(context)
 
       // Aguardar conclusão
       await this.waitForRunCompletion(runId)
 
       // Buscar resposta
       const response = await this.getLastMessage()
-      
+
       return response
     } catch (error) {
       throw error
@@ -152,7 +153,17 @@ export class NoaAssistantIntegration {
   /**
    * Executar assistant na thread
    */
-  private async runAssistant(): Promise<string> {
+  private async runAssistant(additionalInstructions?: string): Promise<string> {
+    const body: any = {
+      assistant_id: this.config.assistantId,
+      tools: [{ type: 'file_search' }]
+    }
+
+    // Adicionar instruções adicionais (contexto dinâmico) se fornecido
+    if (additionalInstructions) {
+      body.additional_instructions = additionalInstructions
+    }
+
     const response = await fetch(
       `https://api.openai.com/v1/threads/${this.threadId}/runs`,
       {
@@ -162,10 +173,7 @@ export class NoaAssistantIntegration {
           'Content-Type': 'application/json',
           'OpenAI-Beta': 'assistants=v2'
         },
-        body: JSON.stringify({
-          assistant_id: this.config.assistantId,
-          tools: [{ type: 'file_search' }] // Habilitar File Search
-        })
+        body: JSON.stringify(body)
       }
     )
 
@@ -254,14 +262,14 @@ export class NoaAssistantIntegration {
 
     // Extrair texto da resposta
     const content = assistantMessage.content[0]
-    
+
     if (content.type === 'text') {
       let text = content.text.value
-      
+
       // Limpar estrutura interna de raciocínio
       // Remove "Raciocínio:" e "Orientação/Resposta:" para deixar só a resposta
       text = this.cleanReasoningStructure(text)
-      
+
       return text
     }
 
@@ -274,13 +282,13 @@ export class NoaAssistantIntegration {
   private cleanReasoningStructure(text: string): string {
     // Remove "Raciocínio:" e seu conteúdo
     text = text.replace(/Raciocínio:\s*[^\n]*(?:\n(?!Orientação\/Resposta:).*)*/gi, '')
-    
+
     // Remove "Orientação/Resposta:" mantendo apenas o conteúdo após
     text = text.replace(/Orientação\/Resposta:\s*/gi, '')
-    
+
     // Limpa linhas vazias extras
     text = text.replace(/\n{3,}/g, '\n\n')
-    
+
     // Remove espaços em branco no início e fim
     return text.trim()
   }
@@ -379,7 +387,7 @@ export class NoaAssistantIntegration {
    */
   private generateClinicalReport(assessmentData: any, patientName: string): string {
     const timestamp = new Date().toLocaleString('pt-BR')
-    
+
     return `
 # RELATÓRIO DE AVALIAÇÃO CLÍNICA INICIAL
 
@@ -457,13 +465,13 @@ Avaliação realizada seguindo metodologia IMRE Triaxial e Arte da Entrevista Cl
   async transferAllResponsibilities(): Promise<any> {
     try {
       console.log('🔄 Nôa Esperança assumindo todas as responsabilidades...')
-      
+
       const transferSystem = getResponsibilityTransferSystem()
       const protocol = await transferSystem.transferAllResponsibilities()
-      
+
       console.log('✅ Transferência completa realizada!')
       console.log(`📊 Responsabilidades assumidas: ${protocol.responsibilities.length}`)
-      
+
       return {
         success: true,
         message: 'Todas as responsabilidades foram transferidas com sucesso para Nôa Esperança',
@@ -504,14 +512,14 @@ Avaliação realizada seguindo metodologia IMRE Triaxial e Arte da Entrevista Cl
   async transferFilePermissions(): Promise<any> {
     try {
       console.log('📁 Nôa Esperança assumindo permissões de manipulação de arquivos...')
-      
+
       const fileTransferSystem = getFilePermissionTransferSystem()
       const result = await fileTransferSystem.transferAllFilePermissions()
-      
+
       console.log('✅ Permissões de arquivos transferidas!')
       console.log(`📊 Operações: ${result.data.operations}`)
       console.log(`📊 Permissões: ${result.data.permissions}`)
-      
+
       return {
         success: result.success,
         message: result.message,
