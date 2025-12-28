@@ -146,7 +146,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
   const stopListening = useCallback(() => {
     // Atualizar ref PRIMEIRO para evitar reinício
     isListeningRef.current = false
-    
+
     const handle = recognitionRef.current
     if (handle) {
       handle.stopped = true
@@ -189,10 +189,10 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       window.speechSynthesis.cancel()
     }
     window.dispatchEvent(new Event('noaStopSpeech'))
-    
+
     // Parar qualquer escuta anterior
     stopListening()
-    
+
     console.log('🎤 Iniciando escuta de voz...')
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -220,22 +220,24 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       if (handle.timer) {
         window.clearTimeout(handle.timer)
       }
-      // Aumentar tempo de espera para 2.5 segundos após silêncio
+      // Aumentar tempo de espera para 5 segundos após silêncio
       // Isso dá tempo para o usuário pensar e continuar falando
       handle.timer = window.setTimeout(() => {
         flush()
-      }, 2500) // 2.5 segundos de silêncio antes de enviar
+      }, 5000) // 5 segundos de silêncio antes de enviar
     }
 
     recognition.onresult = (event: any) => {
+      // Resetar timer em qualquer atividade de voz (mesmo interim)
+      scheduleFlush()
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
           const transcript = result[0].transcript.trim()
           if (transcript.length > 0) {
             handle.buffer += `${transcript} `
-            scheduleFlush()
-            console.log('🎤 Texto capturado:', transcript)
+            console.log('🎤 Texto capturado FINAL:', transcript)
           }
         }
       }
@@ -246,18 +248,18 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       if (event.error === 'no-speech' || event.error === 'aborted') {
         return
       }
-      
+
       // Para erros críticos, logar
       if (event.error !== 'network') {
         console.error('❌ Erro no reconhecimento de voz:', event.error)
       }
-      
+
       if (handle.timer) {
         window.clearTimeout(handle.timer)
         handle.timer = undefined
       }
       flush()
-      
+
       // Só parar se for erro crítico
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         handle.stopped = true
@@ -364,7 +366,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
     // Aguardar um pouco mais após a síntese terminar antes de iniciar reconhecimento
     // Isso evita que o reconhecimento interfira com a síntese
     const delay = isSpeaking ? 1000 : 500 // 1 segundo se estava falando, 500ms caso contrário
-    
+
     const timeoutId = setTimeout(() => {
       // Verificar novamente antes de iniciar
       if (!isProcessing && !isSpeaking && !isListening && !isListeningRef.current) {
@@ -555,7 +557,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
           const transcript = result[0].transcript.trim()
           transcriptBuffer.push(transcript)
           setConsultationTranscript(prev => [...prev, transcript])
-          
+
           // Adicionar mensagem visual no chat
           sendMessage(`[Gravação] ${transcript}`, { preferVoice: false })
         }
@@ -614,7 +616,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
     }
 
     const endTime = new Date()
-    const duration = consultationStartTime 
+    const duration = consultationStartTime
       ? Math.round((endTime.getTime() - consultationStartTime.getTime()) / 1000 / 60) // minutos
       : 0
 
@@ -668,7 +670,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       }
 
       sendMessage(`✅ Consulta gravada e salva com sucesso! Duração: ${duration} minutos.`, { preferVoice: false })
-      
+
       // Resetar estados
       setIsRecordingConsultation(false)
       setConsultationTranscript([])
@@ -697,7 +699,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
     // Abrir modal de categorização
     setUploadedFile(file)
     setShowUploadModal(true)
-    
+
     // Resetar input para permitir selecionar o mesmo arquivo novamente
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -836,10 +838,10 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       console.error('❌ Erro no upload:', error)
       if (progressInterval) clearInterval(progressInterval)
       setUploadProgress(0)
-      
+
       // Adicionar mensagem de erro no chat
       sendMessage(`❌ Erro ao fazer upload do documento "${uploadedFile?.name}": ${error.message || 'Erro desconhecido'}. Por favor, tente novamente.`, { preferVoice: false })
-      
+
       setIsUploading(false)
       setUploadedFile(null)
     }
@@ -877,7 +879,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
           `}</style>
           <div className={clsx('fixed z-50 flex flex-col items-center', positionClasses)}>
             {/* Texto "Click aqui" sem card */}
-            <div 
+            <div
               className="absolute bottom-full mb-2 text-[10px] font-medium text-white whitespace-nowrap"
               style={{
                 textShadow: '0 0 8px rgba(0, 193, 106, 0.9), 0 0 12px rgba(0, 193, 106, 0.6), 0 1px 2px rgba(0, 0, 0, 0.8)',
@@ -896,7 +898,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
               }}
             >
               {/* Brilho ao redor da borda - camada externa */}
-              <div 
+              <div
                 className="absolute inset-0 rounded-full"
                 style={{
                   border: '2px solid rgba(0, 193, 106, 0.4)',
@@ -907,7 +909,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
                 }}
               />
               {/* Brilho ao redor da borda - camada interna */}
-              <div 
+              <div
                 className="absolute inset-0 rounded-full"
                 style={{
                   border: '1px solid rgba(0, 193, 106, 0.6)',
@@ -920,16 +922,16 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
               />
               {/* Conteúdo do botão */}
               <div className="relative z-10 w-full h-full rounded-full flex items-center justify-center overflow-hidden">
-                <img 
-                  src="/brain.png" 
-                  alt="MedCannLab Logo" 
+                <img
+                  src="/brain.png"
+                  alt="MedCannLab Logo"
                   className="w-14 h-14 object-contain p-1"
                   style={{
                     filter: 'brightness(1.1) contrast(1.1) drop-shadow(0 0 8px rgba(0, 193, 106, 0.8))'
                   }}
                 />
                 {/* Brilho interno suave */}
-                <div 
+                <div
                   className="absolute inset-0 rounded-full"
                   style={{
                     background: 'radial-gradient(circle at center, rgba(0, 193, 106, 0.3), transparent 70%)',
@@ -946,9 +948,9 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
       {isOpen && (
         <div className={clsx(
           'fixed z-50 bg-slate-900/95 rounded-3xl shadow-2xl backdrop-blur-xl flex flex-col overflow-hidden transition-all duration-300',
-          isExpanded 
+          isExpanded
             ? 'left-[80px] lg:left-[320px] right-4 top-4 bottom-4' // Expandido: da barra lateral (80px quando colapsada, 320px quando expandida) até a borda direita
-            : position === 'bottom-right' 
+            : position === 'bottom-right'
               ? 'bottom-4 right-4 w-[600px] max-w-[calc(100vw-2rem)] h-[720px] max-h-[calc(100vh-2rem)]'
               : position === 'bottom-left'
                 ? 'bottom-4 left-4 w-[600px] max-w-[calc(100vw-2rem)] h-[720px] max-h-[calc(100vh-2rem)]'
@@ -1099,7 +1101,7 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              
+
               <button
                 onClick={handleUploadClick}
                 disabled={isUploading}
@@ -1192,11 +1194,10 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
                     <button
                       key={cat.id}
                       onClick={() => setUploadCategory(cat.id)}
-                      className={`p-4 rounded-lg border-2 transition-all text-left ${
-                        uploadCategory === cat.id
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
-                      }`}
+                      className={`p-4 rounded-lg border-2 transition-all text-left ${uploadCategory === cat.id
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
+                        }`}
                     >
                       <h3 className="font-semibold text-white text-sm mb-1">{cat.name}</h3>
                       <p className="text-xs text-slate-400">{cat.desc}</p>
@@ -1220,11 +1221,10 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
                     <button
                       key={area.id}
                       onClick={() => setUploadArea(area.id)}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        uploadArea === area.id
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
-                      }`}
+                      className={`p-3 rounded-lg border-2 transition-all ${uploadArea === area.id
+                        ? 'border-emerald-500 bg-emerald-500/10'
+                        : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
+                        }`}
                     >
                       <span className="font-semibold text-white text-sm">{area.name}</span>
                     </button>
@@ -1252,18 +1252,17 @@ const NoaConversationalInterface: React.FC<NoaConversationalInterfaceProps> = ({
                           if (type.id === 'all') {
                             setUploadUserType(['professional', 'student', 'patient'])
                           } else {
-                            setUploadUserType(prev => 
-                              prev.includes(type.id) 
+                            setUploadUserType(prev =>
+                              prev.includes(type.id)
                                 ? prev.filter(t => t !== type.id)
                                 : [...prev, type.id]
                             )
                           }
                         }}
-                        className={`p-3 rounded-lg border-2 transition-all ${
-                          isSelected
-                            ? 'border-emerald-500 bg-emerald-500/10'
-                            : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
-                        }`}
+                        className={`p-3 rounded-lg border-2 transition-all ${isSelected
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
+                          }`}
                       >
                         <span className="font-semibold text-white text-sm">{type.name}</span>
                       </button>

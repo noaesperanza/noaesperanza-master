@@ -1605,11 +1605,9 @@ const NewPatientForm: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+        )}
+      </div>
     </div>
-    </div >
-  )
-}
   )
 }
 
