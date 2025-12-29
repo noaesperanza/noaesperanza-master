@@ -984,45 +984,6 @@ const RicardoValencaDashboard: React.FC = () => {
     loadAppointments()
   }, [user?.id, loadPatients, loadKPIs, loadDoctorDashboardStats, loadAppointments])
 
-  // Verificar agendamentos próximos e mostrar notificações
-  useEffect(() => {
-    const checkUpcomingAppointments = () => {
-      const now = new Date()
-      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000)
-
-      upcomingAppointments.forEach(appointment => {
-        const appointmentTime = new Date(`${appointment.appointment_date.split('T')[0]}T${appointment.formattedTime.replace('h', ':').padStart(5, '0')}:00`)
-
-        // Se o agendamento estiver entre agora e 15 minutos
-        if (appointmentTime > now && appointmentTime <= fifteenMinutesFromNow) {
-          const minutesUntil = Math.floor((appointmentTime - now) / (1000 * 60))
-
-          // Mostrar notificação se ainda não foi mostrada
-          const notificationKey = `appointment-${appointment.id}-${appointmentTime.getTime()}`
-          if (!localStorage.getItem(notificationKey)) {
-            console.log(`⏰ Agendamento em ${minutesUntil} minutos: ${appointment.patient?.name || appointment.title}`)
-
-            // Aqui você pode adicionar uma notificação visual ou sonora
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification('Consulta Próxima', {
-                body: `${appointment.patient?.name || appointment.title} em ${minutesUntil} minutos`,
-                icon: '/favicon.ico'
-              })
-            }
-
-            localStorage.setItem(notificationKey, 'shown')
-          }
-        }
-      })
-    }
-
-    // Verificar a cada minuto
-    const interval = setInterval(checkUpcomingAppointments, 60000)
-    checkUpcomingAppointments() // Verificar imediatamente
-
-    return () => clearInterval(interval)
-  }, [upcomingAppointments])
-
   const handleStartAppointment = useCallback(
     async (appointment: EnrichedAppointment, opts?: { navigateToChat?: boolean }) => {
       try {
@@ -4601,6 +4562,45 @@ const RicardoValencaDashboard: React.FC = () => {
   }, [appointments])
 
   const upcomingAppointments = useMemo(() => appointments.slice(0, 4), [appointments])
+
+  // Verificar agendamentos próximos e mostrar notificações
+  useEffect(() => {
+    const checkUpcomingAppointments = () => {
+      const now = new Date()
+      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000)
+
+      upcomingAppointments.forEach(appointment => {
+        const appointmentTime = new Date(`${appointment.appointment_date.split('T')[0]}T${appointment.formattedTime.replace('h', ':').padStart(5, '0')}:00`)
+
+        // Se o agendamento estiver entre agora e 15 minutos
+        if (appointmentTime > now && appointmentTime <= fifteenMinutesFromNow) {
+          const minutesUntil = Math.floor((appointmentTime - now) / (1000 * 60))
+
+          // Mostrar notificação se ainda não foi mostrada
+          const notificationKey = `appointment-${appointment.id}-${appointmentTime.getTime()}`
+          if (!localStorage.getItem(notificationKey)) {
+            console.log(`⏰ Agendamento em ${minutesUntil} minutos: ${appointment.patient?.name || appointment.title}`)
+
+            // Aqui você pode adicionar uma notificação visual ou sonora
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('Consulta Próxima', {
+                body: `${appointment.patient?.name || appointment.title} em ${minutesUntil} minutos`,
+                icon: '/favicon.ico'
+              })
+            }
+
+            localStorage.setItem(notificationKey, 'shown')
+          }
+        }
+      })
+    }
+
+    // Verificar a cada minuto
+    const interval = setInterval(checkUpcomingAppointments, 60000)
+    checkUpcomingAppointments() // Verificar imediatamente
+
+    return () => clearInterval(interval)
+  }, [upcomingAppointments])
 
   const {
     totalToday: totalTodayCount,

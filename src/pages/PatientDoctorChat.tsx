@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, ChevronRight, Loader2, MessageCircle, Send, Users } from 'lucide-react'
 
 import { useAuth } from '../contexts/AuthContext'
@@ -22,6 +22,7 @@ const PatientDoctorChat: React.FC = () => {
   const { user } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const { patientId } = useParams<{ patientId?: string }>()
   const roomIdParam = new URLSearchParams(location.search).get('roomId')
   const searchParams = new URLSearchParams(location.search)
   const origin = searchParams.get('origin')
@@ -33,6 +34,7 @@ const PatientDoctorChat: React.FC = () => {
   const [participants, setParticipants] = useState<ParticipantSummary[]>([])
   const [participantsLoading, setParticipantsLoading] = useState(false)
   const [messageInput, setMessageInput] = useState('')
+  const [filteredRoomId, setFilteredRoomId] = useState<string | undefined>(undefined)
   const hasTriggeredStartRef = useRef(false)
 
   const {
@@ -46,8 +48,15 @@ const PatientDoctorChat: React.FC = () => {
   } = useChatSystem(activeRoomId, { enabled: !isImpersonatingPatient })
 
   const patientRooms = useMemo(
-    () => inbox.filter(room => room.type === 'patient'),
-    [inbox]
+    () => {
+      const rooms = inbox.filter(room => room.type === 'patient')
+      // Se um patientId específico foi fornecido na URL, filtra apenas a sala desse paciente
+      if (patientId && filteredRoomId) {
+        return rooms.filter(room => room.id === filteredRoomId)
+      }
+      return rooms
+    },
+    [inbox, patientId, filteredRoomId]
   )
 
   useEffect(() => {
@@ -154,6 +163,51 @@ const PatientDoctorChat: React.FC = () => {
 
     void triggerAssessment()
   }, [activeRoomId, isImpersonatingPatient, location.pathname, location.search, navigate, sendMessage, startParam, user])
+
+  // Efeito para encontrar a sala de chat do paciente específico
+  useEffect(() => {
+    if (!patientId || !inbox.length) {
+      setFilteredRoomId(undefined)
+      return
+    }
+
+    const findPatientRoom = async () => {
+      try {
+        // Buscar salas onde o paciente é participante
+        const { data: participantRooms, error } = await supabase
+          .from('chat_participants')
+          .select('room_id')
+          .eq('user_id', patientId)
+
+        if (error || !participantRooms?.length) {
+          console.warn('Não encontrou sala para o paciente:', patientId)
+          setFilteredRoomId(undefined)
+          return
+        }
+
+        // Encontrar a sala de chat do tipo 'patient' que o paciente participa
+        const patientRoomIds = participantRooms.map(p => p.room_id)
+        const patientRoom = inbox.find(room => 
+          room.type === 'patient' && patientRoomIds.includes(room.id)
+        )
+
+        if (patientRoom) {
+          setFilteredRoomId(patientRoom.id)
+          // Se não há roomId ativo, define este como ativo
+          if (!activeRoomId) {
+            setActiveRoomId(patientRoom.id)
+          }
+        } else {
+          setFilteredRoomId(undefined)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar sala do paciente:', error)
+        setFilteredRoomId(undefined)
+      }
+    }
+
+    findPatientRoom()
+  }, [patientId, inbox, activeRoomId])
 
   if (!user) {
     return (
@@ -378,6 +432,7 @@ const PatientDoctorChat: React.FC = () => {
                     type="submit"
                     disabled={!activeRoomId || !messageInput.trim()}
                     className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-primary-600 hover:bg-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Enviar mensagem"
                   >
                     <Send className="w-4 h-4 text-white" />
                   </button>
