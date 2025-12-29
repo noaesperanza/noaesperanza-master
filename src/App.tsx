@@ -65,7 +65,7 @@ import Scheduling from './pages/Scheduling'
 import Prescriptions from './pages/Prescriptions'
 import PatientsManagement from './pages/PatientsManagement'
 import NewPatientForm from './pages/NewPatientForm'
-import ProfessionalChat from './pages/ProfessionalChat'
+import ChatProfissionais from './pages/ChatProfissionais'
 import { SubscriptionPlans } from './pages/SubscriptionPlans'
 import { PaymentCheckout } from './pages/PaymentCheckout'
 import { LessonPreparation } from './pages/LessonPreparation'
@@ -76,9 +76,9 @@ import PatientManagementAdvanced from './pages/PatientManagementAdvanced'
 function App() {
   return (
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AuthProvider>
-            <UserViewProvider>
-              <ToastProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <UserViewProvider>
                 <NoaProvider>
                   <NoaPlatformProvider>
                     <RealtimeProvider>
@@ -119,10 +119,17 @@ function App() {
                 <Route path="clinica/profissional/pacientes" element={<PatientsManagement />} />
                 <Route path="clinica/profissional/agendamentos" element={<ProfessionalScheduling />} />
                 <Route path="clinica/profissional/relatorios" element={<Reports />} />
-                <Route path="clinica/profissional/chat-profissionais" element={<ProfessionalChat />} />
+                <Route path="clinica/profissional/chat-profissionais" element={<ChatProfissionais />} />
                 
                 <Route path="clinica/paciente/dashboard" element={<PatientDashboard />} />
-                <Route path="clinica/paciente/avaliacao-clinica" element={<ClinicalAssessment />} />
+                <Route
+                  path="clinica/paciente/avaliacao-clinica"
+                  element={
+                    <ProtectedRoute requiredRole="paciente">
+                      <ClinicalAssessment />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="clinica/paciente/relatorios" element={<Reports />} />
                 <Route path="clinica/paciente/agendamentos" element={<PatientAppointments />} />
                 <Route path="clinica/paciente/agenda" element={<PatientAgenda />} />
@@ -166,7 +173,10 @@ function App() {
                 <Route path="study-area" element={<StudyArea />} />
                 <Route path="library" element={<Library />} />
                 <Route path="chat" element={<ChatGlobal />} />
-                <Route path="chat-noa-esperanca" element={<PatientNOAChat />} />
+                <Route
+                  path="chat-noa-esperanca"
+                  element={<Navigate to="/app/clinica/paciente/avaliacao-clinica" replace />}
+                />
                 <Route path="patient-chat" element={<PatientChat />} />
                     <Route path="forum" element={<ForumCasosClinicos />} />
                 <Route path="gamificacao" element={<Gamificacao />} />
@@ -218,7 +228,7 @@ function App() {
                 } />
                 <Route path="professional-chat" element={
                   <ProtectedRoute requiredRole="profissional">
-                    <ProfessionalChat />
+                    <ChatProfissionais />
                   </ProtectedRoute>
                 } />
                 <Route path="subscription-plans" element={<SubscriptionPlans />} />
@@ -292,9 +302,9 @@ function App() {
                     </RealtimeProvider>
                   </NoaPlatformProvider>
                 </NoaProvider>
-              </ToastProvider>
-            </UserViewProvider>
-          </AuthProvider>
+              </UserViewProvider>
+            </AuthProvider>
+          </ToastProvider>
         </BrowserRouter>
   )
 }

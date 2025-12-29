@@ -28,7 +28,7 @@ export interface PlatformActionResult {
 }
 
 export class PlatformFunctionsModule {
-  private activeAssessments: Map<string, any> = new Map()
+  public activeAssessments: Map<string, any> = new Map()
 
   /**
    * Detectar intenção relacionada a funções da plataforma
@@ -41,11 +41,11 @@ export class PlatformFunctionsModule {
       const assessment = this.activeAssessments.get(userId)
       if (assessment) {
         // Verificar se a avaliação está sendo concluída
-        if (lowerMessage.includes('finalizar') || 
-            lowerMessage.includes('concluir') ||
-            lowerMessage.includes('terminar') ||
-            lowerMessage.includes('pronto') ||
-            assessment.step === 'EVOLUTION') {
+        if (lowerMessage.includes('finalizar') ||
+          lowerMessage.includes('concluir') ||
+          lowerMessage.includes('terminar') ||
+          lowerMessage.includes('pronto') ||
+          assessment.step === 'EVOLUTION') {
           return {
             type: 'ASSESSMENT_COMPLETE',
             confidence: 0.9,
@@ -57,9 +57,9 @@ export class PlatformFunctionsModule {
 
     // Detectar início de avaliação clínica inicial
     if (lowerMessage.includes('avaliação clínica inicial') ||
-        lowerMessage.includes('avaliacao clinica inicial') ||
-        lowerMessage.includes('protocolo imre') ||
-        (lowerMessage.includes('avaliação') && lowerMessage.includes('imre'))) {
+      lowerMessage.includes('avaliacao clinica inicial') ||
+      lowerMessage.includes('protocolo imre') ||
+      (lowerMessage.includes('avaliação') && lowerMessage.includes('imre'))) {
       return {
         type: 'ASSESSMENT_START',
         confidence: 0.95,
@@ -69,8 +69,8 @@ export class PlatformFunctionsModule {
 
     // Detectar geração de relatório
     if (lowerMessage.includes('gerar relatório') ||
-        lowerMessage.includes('relatório clínico') ||
-        lowerMessage.includes('criar relatório')) {
+      lowerMessage.includes('relatório clínico') ||
+      lowerMessage.includes('criar relatório')) {
       return {
         type: 'REPORT_GENERATE',
         confidence: 0.85,
@@ -80,8 +80,8 @@ export class PlatformFunctionsModule {
 
     // Detectar consulta ao dashboard
     if (lowerMessage.includes('dashboard') ||
-        lowerMessage.includes('meus relatórios') ||
-        lowerMessage.includes('relatórios salvos')) {
+      lowerMessage.includes('meus relatórios') ||
+      lowerMessage.includes('relatórios salvos')) {
       return {
         type: 'DASHBOARD_QUERY',
         confidence: 0.8,
@@ -92,15 +92,15 @@ export class PlatformFunctionsModule {
     // Detectar consulta sobre pacientes
     if (lowerMessage.includes('paciente') || lowerMessage.includes('prontuário') || lowerMessage.includes('prontuario')) {
       if (lowerMessage.includes('ativo') ||
-          lowerMessage.includes('meus pacientes') ||
-          lowerMessage.includes('lista de pacientes') ||
-          lowerMessage.includes('verificar') ||
-          lowerMessage.includes('nome do paciente') ||
-          lowerMessage.includes('paciente ativo') ||
-          lowerMessage.includes('no meu prontuário') ||
-          lowerMessage.includes('no meu prontuario') ||
-          lowerMessage.includes('que está constando') ||
-          lowerMessage.includes('na minha aba')) {
+        lowerMessage.includes('meus pacientes') ||
+        lowerMessage.includes('lista de pacientes') ||
+        lowerMessage.includes('verificar') ||
+        lowerMessage.includes('nome do paciente') ||
+        lowerMessage.includes('paciente ativo') ||
+        lowerMessage.includes('no meu prontuário') ||
+        lowerMessage.includes('no meu prontuario') ||
+        lowerMessage.includes('que está constando') ||
+        lowerMessage.includes('na minha aba')) {
         return {
           type: 'PATIENTS_QUERY',
           confidence: 0.95,
@@ -117,11 +117,11 @@ export class PlatformFunctionsModule {
 
     // Detectar consulta sobre relatórios
     if (lowerMessage.includes('relatório') && (
-        lowerMessage.includes('emitido') ||
-        lowerMessage.includes('número') ||
-        lowerMessage.includes('quantos') ||
-        lowerMessage.includes('total')
-      )) {
+      lowerMessage.includes('emitido') ||
+      lowerMessage.includes('número') ||
+      lowerMessage.includes('quantos') ||
+      lowerMessage.includes('total')
+    )) {
       return {
         type: 'REPORTS_COUNT_QUERY',
         confidence: 0.85,
@@ -130,15 +130,15 @@ export class PlatformFunctionsModule {
     }
 
     // Detectar consulta sobre agendamentos
-    if (lowerMessage.includes('agendamento') || 
-        lowerMessage.includes('consulta') ||
-        lowerMessage.includes('agenda')) {
+    if (lowerMessage.includes('agendamento') ||
+      lowerMessage.includes('consulta') ||
+      lowerMessage.includes('agenda')) {
       // Verificar se é criação de agendamento
-      if (lowerMessage.includes('agendar') || 
-          lowerMessage.includes('marcar') ||
-          lowerMessage.includes('criar agendamento') ||
-          lowerMessage.includes('nova consulta') ||
-          lowerMessage.includes('marcar consulta')) {
+      if (lowerMessage.includes('agendar') ||
+        lowerMessage.includes('marcar') ||
+        lowerMessage.includes('criar agendamento') ||
+        lowerMessage.includes('nova consulta') ||
+        lowerMessage.includes('marcar consulta')) {
         return {
           type: 'APPOINTMENT_CREATE',
           confidence: 0.9,
@@ -151,13 +151,13 @@ export class PlatformFunctionsModule {
         metadata: { userId }
       }
     }
-    
+
     // Detectar criação de novo paciente
     if (lowerMessage.includes('novo paciente') ||
-        lowerMessage.includes('cadastrar paciente') ||
-        lowerMessage.includes('adicionar paciente') ||
-        lowerMessage.includes('registrar paciente') ||
-        (lowerMessage.includes('paciente') && (lowerMessage.includes('novo') || lowerMessage.includes('cadastrar') || lowerMessage.includes('adicionar')))) {
+      lowerMessage.includes('cadastrar paciente') ||
+      lowerMessage.includes('adicionar paciente') ||
+      lowerMessage.includes('registrar paciente') ||
+      (lowerMessage.includes('paciente') && (lowerMessage.includes('novo') || lowerMessage.includes('cadastrar') || lowerMessage.includes('adicionar')))) {
       return {
         type: 'PATIENT_CREATE',
         confidence: 0.9,
@@ -167,10 +167,10 @@ export class PlatformFunctionsModule {
 
     // Detectar consulta sobre KPIs ou estatísticas
     if (lowerMessage.includes('kpi') ||
-        lowerMessage.includes('estatística') ||
-        lowerMessage.includes('status') ||
-        lowerMessage.includes('quantidade') ||
-        lowerMessage.includes('total de')) {
+      lowerMessage.includes('estatística') ||
+      lowerMessage.includes('status') ||
+      lowerMessage.includes('quantidade') ||
+      lowerMessage.includes('total de')) {
       return {
         type: 'KPIS_QUERY',
         confidence: 0.8,
@@ -425,7 +425,7 @@ export class PlatformFunctionsModule {
           if (patientId) {
             const assessmentData = assessment.data || {}
             const patientName = assessmentData.name || assessment.patient_name || `Paciente ${patientId.slice(0, 8)}`
-            
+
             if (!patientsMap.has(patientId)) {
               patientsMap.set(patientId, {
                 id: patientId,
@@ -528,9 +528,9 @@ export class PlatformFunctionsModule {
         data: {
           patients,
           totalPatients: patients.length,
-          activePatients: patients.filter(p => 
-            p.status === 'Ativo' || 
-            p.status === 'completed' || 
+          activePatients: patients.filter(p =>
+            p.status === 'Ativo' ||
+            p.status === 'completed' ||
             p.status === 'in_progress' ||
             p.status === 'active'
           ).length
@@ -561,7 +561,7 @@ export class PlatformFunctionsModule {
       if (error) throw error
 
       const totalReports = reports?.length || 0
-      
+
       // Relatórios por status
       const completed = reports?.filter(r => r.status === 'completed' || r.status === 'validated').length || 0
       const pending = reports?.filter(r => r.status === 'pending' || r.status === 'shared').length || 0
@@ -569,7 +569,7 @@ export class PlatformFunctionsModule {
 
       // Relatórios de hoje
       const today = new Date().toISOString().split('T')[0]
-      const todayReports = reports?.filter(r => 
+      const todayReports = reports?.filter(r =>
         r.created_at?.startsWith(today)
       ).length || 0
 
@@ -627,10 +627,10 @@ export class PlatformFunctionsModule {
       }
 
       const appointmentsData = appointments || []
-      
+
       // Agendamentos de hoje
       const today = new Date().toISOString().split('T')[0]
-      const todayAppointments = appointmentsData.filter(a => 
+      const todayAppointments = appointmentsData.filter(a =>
         a.appointment_date?.startsWith(today)
       )
 
@@ -681,7 +681,7 @@ export class PlatformFunctionsModule {
 
       // Avaliações de hoje
       const today = new Date().toISOString().split('T')[0]
-      const todayAssessments = assessments.filter(a => 
+      const todayAssessments = assessments.filter(a =>
         a.created_at?.startsWith(today)
       ).length
 
@@ -796,7 +796,7 @@ export class PlatformFunctionsModule {
       // Salvar agendamento
       // Usar professional_id se doctor_id não estiver disponível (compatibilidade)
       const professionalId = appointmentData.doctor_id || null
-      
+
       const insertData: any = {
         patient_id: patientData.id,
         title: appointmentData.type || 'Consulta Médica',
@@ -807,13 +807,13 @@ export class PlatformFunctionsModule {
         is_remote: false,
         notes: appointmentData.notes || ''
       }
-      
+
       // Adicionar doctor_id se disponível, senão usar professional_id
       if (professionalId) {
         insertData.doctor_id = professionalId
         insertData.professional_id = professionalId
       }
-      
+
       const { data, error } = await supabase
         .from('appointments')
         .insert(insertData)

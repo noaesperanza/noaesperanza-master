@@ -4,7 +4,7 @@ import { useUserView } from '../contexts/UserViewContext'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { normalizeUserType } from '../lib/userTypes'
 import PatientManagementAdvanced from './PatientManagementAdvanced'
-import ProfessionalChatSystem from '../components/ProfessionalChatSystem'
+import ChatProfissionais from './ChatProfissionais'
 import VideoCall from '../components/VideoCall'
 import ClinicalReports from '../components/ClinicalReports'
 import IntegrativePrescriptions from '../components/IntegrativePrescriptions'
@@ -3843,7 +3843,7 @@ const RicardoValencaDashboard: React.FC = () => {
           Comunicação segura entre consultórios da plataforma MedCannLab
         </p>
       </div>
-      <ProfessionalChatSystem />
+      <ChatProfissionais />
     </div>
   )
 

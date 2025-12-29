@@ -49,7 +49,7 @@ import CoordenacaoMedica from '../components/CoordenacaoMedica'
 import GestaoCursos from '../components/GestaoCursos'
 import NeurologiaPediatrica from '../components/NeurologiaPediatrica'
 import WearableMonitoring from '../components/WearableMonitoring'
-import ProfessionalChatSystem from '../components/ProfessionalChatSystem'
+import ChatProfissionais from './ChatProfissionais'
 import IntegratedDocuments from '../components/IntegratedDocuments'
 
 interface Patient {
@@ -1168,7 +1168,7 @@ const EduardoFaveretDashboard: React.FC = () => {
                 Comunicação segura entre consultórios da plataforma MedCannLab
               </p>
             </div>
-            <ProfessionalChatSystem />
+            <ChatProfissionais />
           </div>
         )}
 

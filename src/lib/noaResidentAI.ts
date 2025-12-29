@@ -91,7 +91,6 @@ export class NoaResidentAI {
   private assistantIntegration = getNoaAssistantIntegration()
   private platformFunctions = getPlatformFunctionsModule()
   private readonly masterDocumentDigest = this.buildMasterDocumentDigest()
-  private activeAssessments: Map<string, IMREAssessmentState> = new Map()
 
   constructor() {
     this.config = {
@@ -161,74 +160,82 @@ Você tem acesso a dados em tempo real da plataforma. Use-os para personalizar c
         }
       }
 
-      // SEMPRE usar o Assistant para gerar a resposta (mantém personalidade da Nôa)
-      console.log('🔗 Chamando Assistant API...')
-      const assistantResponse = await this.getAssistantResponse(
-        userMessage,
-        intent,
-        platformData,
-        userEmail
-      )
+      // Lógica de prioridade: Se for uma avaliação, usamos o processamento local
+      // para garantir a aderência ao protocolo IMRE/AEC.
+      let response: AIResponse | null = null;
+      const isActive = userId ? this.platformFunctions.activeAssessments.has(userId) : false;
 
-      if (assistantResponse) {
-        console.log('✅ Resposta do Assistant recebida:', assistantResponse.content.substring(0, 100) + '...')
+      if (intent === 'assessment' || isActive) {
+        console.log('📋 Usando lógica local para protocolo de avaliação');
+        response = await this.processAssessment(userMessage, userId, platformData, userEmail);
+      } else {
+        // Para outras intenções, tentamos o Assistant primeiro (personalidade da Nôa)
+        console.log('🔗 Chamando Assistant API...');
+        response = await this.getAssistantResponse(
+          userMessage,
+          intent,
+          platformData,
+          userEmail
+        );
+      }
+
+      if (response) {
+        console.log('✅ Resposta gerada:', response.content.substring(0, 100) + '...');
         // Se houve ação da plataforma bem-sucedida, adicionar metadata
         if (platformActionResult?.success) {
-          assistantResponse.metadata = {
-            ...assistantResponse.metadata,
+          response.metadata = {
+            ...response.metadata,
             platformAction: platformActionResult.data
-          }
+          };
         }
 
         // Salvar na memória local
-        this.saveToMemory(userMessage, assistantResponse, userId)
+        this.saveToMemory(userMessage, response, userId);
 
         // 🔥 SALVAR AUTOMATICAMENTE NO PRONTUÁRIO DO PACIENTE (tempo real)
-        const assessmentState = intent === 'assessment'
-          ? this.activeAssessments.get(userId || '')
-          : undefined
+        const assessmentState = userId ? this.platformFunctions.activeAssessments.get(userId) : undefined;
 
         // Salvar interação no prontuário do paciente
         await this.saveChatInteractionToPatientRecord(
           userMessage,
-          assistantResponse.content,
+          response.content,
           userId,
           platformData,
           assessmentState
         )
 
-        return assistantResponse
+        return response
       }
 
-      // Fallback: usar processamento local se Assistant não responder
-      let response: AIResponse
+      // Fallback: usar processamento local se Assistant não retornar
+      let fallbackResponse: AIResponse
 
       switch (intent) {
         case 'assessment':
-          response = await this.processAssessment(userMessage, userId, platformData, userEmail)
+          fallbackResponse = await this.processAssessment(userMessage, userId, platformData, userEmail)
           break
         case 'clinical':
-          response = await this.processClinicalQuery(userMessage, userId, platformData, userEmail)
+          fallbackResponse = await this.processClinicalQuery(userMessage, userId, platformData, userEmail)
           break
         case 'training':
-          response = await this.processTrainingQuery(userMessage, userId, platformData, userEmail)
+          fallbackResponse = await this.processTrainingQuery(userMessage, userId, platformData, userEmail)
           break
         case 'platform':
-          response = await this.processPlatformQuery(userMessage, userId, platformData, userEmail)
+          fallbackResponse = await this.processPlatformQuery(userMessage, userId, platformData, userEmail)
           break
         case 'general':
         default:
-          response = await this.processGeneralQuery(userMessage, userId, platformData, userEmail)
+          fallbackResponse = await this.processGeneralQuery(userMessage, userId, platformData, userEmail)
           break
       }
 
       // Salvar na memória
-      this.saveToMemory(userMessage, response, userId)
+      this.saveToMemory(userMessage, fallbackResponse, userId)
 
       // Verificar se a avaliação foi concluída e gerar relatório
       await this.checkForAssessmentCompletion(userMessage, userId)
 
-      return response
+      return fallbackResponse
     } catch (error) {
       console.error('Erro ao processar mensagem:', error)
       return this.createResponse(
@@ -243,11 +250,11 @@ Você tem acesso a dados em tempo real da plataforma. Use-os para personalizar c
   // --- Novos Métodos para Relatórios Dinâmicos ---
 
   public getActiveAssessment(userId: string): IMREAssessmentState | undefined {
-    return this.activeAssessments.get(userId)
+    return this.platformFunctions.activeAssessments.get(userId)
   }
 
   public async generateClinicalSummary(userId: string): Promise<StructuredClinicalSummary | null> {
-    const assessment = this.activeAssessments.get(userId)
+    const assessment = this.platformFunctions.activeAssessments.get(userId)
     if (!assessment) {
       console.warn('❌ Tentativa de gerar resumo sem avaliação ativa para:', userId)
       return null
@@ -557,28 +564,31 @@ Você tem acesso a dados em tempo real da plataforma. Use-os para personalizar c
     }
   }
 
-  private async processAssessment(message: string, userId?: string, platformData?: any, userEmail?: string): Promise<AIResponse> {
+  private async processAssessment(
+    message: string,
+    userId?: string,
+    platformData?: any,
+    userEmail?: string
+  ): Promise<AIResponse> {
     if (!userId) {
-      return this.createResponse(
-        'Para iniciar uma avaliação clínica, você precisa estar logado. Por favor, faça login e tente novamente.',
-        0.3,
-        'error'
-      )
+      return this.createResponse('Preciso identificar seu usuário para iniciar a avaliação.', 0.8, 'assessment')
     }
 
     const lowerMessage = message.toLowerCase()
     const assessmentKey = userId
 
     // Verificar se há uma avaliação em andamento
-    let assessment = this.activeAssessments.get(assessmentKey)
+    let assessment = this.platformFunctions.activeAssessments.get(assessmentKey)
 
     // Se a mensagem indica início de avaliação clínica inicial IMRE
     if (!assessment && (
       lowerMessage.includes('avaliação clínica inicial') ||
       lowerMessage.includes('avaliacao clinica inicial') ||
       lowerMessage.includes('protocolo imre') ||
-      lowerMessage.includes('avaliação imre') ||
-      lowerMessage.includes('iniciar avaliação')
+      lowerMessage.includes('imre') ||
+      lowerMessage.includes('iniciar avaliação') ||
+      lowerMessage.includes('pode iniciar') ||
+      lowerMessage.includes('iniciar protocolo')
     )) {
       // Iniciar nova avaliação (sincronizar com platformFunctions)
       assessment = {
@@ -1357,7 +1367,7 @@ Gere apenas a próxima pergunta sobre hábitos de vida.`
       }
 
       // Adicionar contexto de avaliação se houver
-      const assessment = platformData?.user?.id ? this.activeAssessments.get(platformData.user.id) : undefined
+      const assessment = platformData?.user?.id ? this.platformFunctions.activeAssessments.get(platformData.user.id) : undefined
       if (assessment) {
         context += `\nAvaliação em Andamento:\n`
         context += `Etapa: ${assessment.step}\n`
