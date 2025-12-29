@@ -1,13 +1,16 @@
--- Atualizar senha do rrvalenca@gmail.com para newpassword123
+-- ATUALIZAR SENHA DO USUÁRIO rrvalenca@gmail.com PARA 123@456
+-- Execute este comando no SQL Editor do Supabase Dashboard
+
 UPDATE auth.users
-SET encrypted_password = crypt('newpassword123', gen_salt('bf'))
+SET encrypted_password = crypt('123@456', gen_salt('bf'))
 WHERE email = 'rrvalenca@gmail.com';
 
--- Verificar atualização
+-- Verificar se a atualização foi bem-sucedida
 SELECT
   id,
   email,
   raw_user_meta_data->>'type' as user_type,
-  raw_user_meta_data->>'name' as name
+  raw_user_meta_data->>'name' as name,
+  created_at
 FROM auth.users
 WHERE email = 'rrvalenca@gmail.com';

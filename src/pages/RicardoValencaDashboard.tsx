@@ -39,7 +39,8 @@ import {
   GraduationCap,
   Loader2,
   ArrowRight,
-  X
+  X,
+  MapPin
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { getAllPatients, isAdmin } from '../lib/adminPermissions'
@@ -981,28 +982,95 @@ const RicardoValencaDashboard: React.FC = () => {
     loadKPIs()
     loadDoctorDashboardStats()
     loadAppointments()
-  }, [user?.id, loadPatients, loadKPIs, loadDoctorDashboardStats, loadAppointments])
+  // Verificar agendamentos próximos e mostrar notificações
+  useEffect(() => {
+    const checkUpcomingAppointments = () => {
+      const now = new Date()
+      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000)
+
+      upcomingAppointments.forEach(appointment => {
+        const appointmentTime = new Date(`${appointment.appointment_date.split('T')[0]}T${appointment.formattedTime.replace('h', ':').padStart(5, '0')}:00`)
+
+        // Se o agendamento estiver entre agora e 15 minutos
+        if (appointmentTime > now && appointmentTime <= fifteenMinutesFromNow) {
+          const minutesUntil = Math.floor((appointmentTime - now) / (1000 * 60))
+
+          // Mostrar notificação se ainda não foi mostrada
+          const notificationKey = `appointment-${appointment.id}-${appointmentTime.getTime()}`
+          if (!localStorage.getItem(notificationKey)) {
+            console.log(`⏰ Agendamento em ${minutesUntil} minutos: ${appointment.patient?.name || appointment.title}`)
+
+            // Aqui você pode adicionar uma notificação visual ou sonora
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('Consulta Próxima', {
+                body: `${appointment.patient?.name || appointment.title} em ${minutesUntil} minutos`,
+                icon: '/favicon.ico'
+              })
+            }
+
+            localStorage.setItem(notificationKey, 'shown')
+          }
+        }
+      })
+    }
+
+    // Verificar a cada minuto
+    const interval = setInterval(checkUpcomingAppointments, 60000)
+    checkUpcomingAppointments() // Verificar imediatamente
+
+    return () => clearInterval(interval)
+  }, [upcomingAppointments])
 
   const handleStartAppointment = useCallback(
-    (appointment: EnrichedAppointment, opts?: { navigateToChat?: boolean }) => {
-      if (appointment.patient_id) {
-        handlePatientSelect(appointment.patient_id)
-      } else {
-        setSelectedPatient(null)
-        setSelectedAppointmentId(appointment.id)
-      }
+    async (appointment: EnrichedAppointment, opts?: { navigateToChat?: boolean }) => {
+      try {
+        // Atualizar status do agendamento para "em andamento" se estiver confirmado
+        if (appointment.status === 'confirmed' || appointment.status === 'scheduled') {
+          const { error: updateError } = await supabase
+            .from('appointments')
+            .update({
+              status: 'in_progress',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', appointment.id)
 
-      setSelectedAppointmentId(appointment.id)
-
-      if (opts?.navigateToChat) {
-        if (appointment.patient_id) {
-          navigate(`/app/clinica/paciente/chat-profissional/${appointment.patient_id}`)
-        } else {
-          navigate('/app/clinica/paciente/chat-profissional')
+          if (updateError) {
+            console.error('Erro ao atualizar status do agendamento:', updateError)
+          } else {
+            console.log('✅ Status do agendamento atualizado para "em andamento"')
+            // Recarregar agendamentos para refletir a mudança
+            loadAppointments()
+          }
         }
+
+        // Selecionar paciente se existir
+        if (appointment.patient_id) {
+          handlePatientSelect(appointment.patient_id)
+        } else {
+          setSelectedPatient(null)
+          setSelectedAppointmentId(appointment.id)
+        }
+
+        setSelectedAppointmentId(appointment.id)
+
+        // Navegar para chat se solicitado
+        if (opts?.navigateToChat) {
+          if (appointment.patient_id) {
+            navigate(`/app/clinica/paciente/chat-profissional/${appointment.patient_id}`)
+          } else {
+            navigate('/app/clinica/paciente/chat-profissional')
+          }
+        }
+
+        // Log da ação
+        console.log(`🏥 Atendimento iniciado: ${appointment.patient?.name || appointment.title} - ${appointment.formattedDate} ${appointment.formattedTime}`)
+
+      } catch (error) {
+        console.error('Erro ao iniciar atendimento:', error)
+        alert('Erro ao iniciar atendimento. Tente novamente.')
       }
     },
-    [handlePatientSelect, navigate]
+    [handlePatientSelect, navigate, loadAppointments]
   )
 
   const handleCreateAppointment = useCallback(() => {
@@ -3274,14 +3342,26 @@ const RicardoValencaDashboard: React.FC = () => {
                 <p className="text-sm text-slate-300">
                   {appointmentsLoading
                     ? 'Sincronizando com o Supabase...'
-                    : `${upcomingAppointments.length} consulta(s) agendada(s)`}
+                    : `${upcomingAppointments.length} ${upcomingAppointments.length === 1 ? 'consulta agendada' : 'consultas agendadas'}`}
                 </p>
+                {/* Estatísticas rápidas */}
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1 text-xs text-slate-400">
+                    <CheckCircle className="w-3 h-3 text-green-400" />
+                    <span>{appointments.filter(a => a.status === 'completed').length} concluídos hoje</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-slate-400">
+                    <Clock className="w-3 h-3 text-blue-400" />
+                    <span>{appointments.filter(a => a.status === 'confirmed').length} confirmados</span>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={() => goToSection('agendamentos')}
-                className="text-xs text-[#00F5A0] hover:text-white transition-colors"
+                className="flex items-center gap-2 text-xs text-[#00F5A0] hover:text-white transition-colors px-3 py-1 rounded-lg hover:bg-[#00F5A0]/10"
               >
-                Ver agenda completa →
+                <Calendar className="w-3 h-3" />
+                Ver agenda completa
               </button>
             </div>
 
@@ -3319,28 +3399,52 @@ const RicardoValencaDashboard: React.FC = () => {
               {!appointmentsLoading && upcomingAppointments.map(appointment => {
                 const badge = getStatusBadge(appointment.status)
                 const isSelected = selectedAppointmentId === appointment.id
+                const isToday = new Date(appointment.appointment_date).toDateString() === new Date().toDateString()
+                const isTomorrow = new Date(appointment.appointment_date).toDateString() === new Date(Date.now() + 86400000).toDateString()
+
                 return (
                   <div
                     key={appointment.id}
                     onClick={() => handleStartAppointment(appointment)}
-                    className={`rounded-xl p-4 transition-all border ${
+                    className={`rounded-xl p-4 transition-all border cursor-pointer group ${
                       isSelected
-                        ? 'border-[#00F5A0]/40 bg-emerald-500/10 shadow-lg'
-                        : 'border-slate-600/40 hover:border-[#00F5A0]/30 bg-slate-800/70'
-                    } cursor-pointer`}
+                        ? 'border-[#00F5A0]/40 bg-emerald-500/10 shadow-lg ring-1 ring-[#00F5A0]/20'
+                        : 'border-slate-600/40 hover:border-[#00F5A0]/30 bg-slate-800/70 hover:bg-slate-800/90'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <h4 className="text-lg font-semibold text-white">
-                          {appointment.patient?.name || appointment.title}
-                        </h4>
-                        <p className="text-xs text-slate-300">
-                          {appointment.type ? appointment.type : 'Consulta clínica'} • {appointment.formattedDate}
-                        </p>
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-lg font-semibold text-white group-hover:text-[#00F5A0] transition-colors">
+                            {appointment.patient?.name || appointment.title}
+                          </h4>
+                          {isToday && (
+                            <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-1 rounded-full">
+                              Hoje
+                            </span>
+                          )}
+                          {isTomorrow && (
+                            <span className="text-xs bg-orange-500/20 text-orange-300 px-2 py-1 rounded-full">
+                              Amanhã
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-300">
+                          <Stethoscope className="w-3 h-3" />
+                          <span>{appointment.type ? appointment.type : 'Consulta clínica'}</span>
+                          <span>•</span>
+                          <span>{appointment.formattedDate}</span>
+                        </div>
                         {appointment.description && (
-                          <p className="text-xs text-slate-400 line-clamp-2">
+                          <p className="text-xs text-slate-400 line-clamp-2 bg-slate-900/50 p-2 rounded">
                             {appointment.description}
                           </p>
+                        )}
+                        {appointment.location && (
+                          <div className="flex items-center gap-1 text-xs text-slate-400">
+                            <MapPin className="w-3 h-3" />
+                            <span>{appointment.location}</span>
+                          </div>
                         )}
                       </div>
                       <div className="flex flex-col items-end space-y-2">
@@ -3349,30 +3453,59 @@ const RicardoValencaDashboard: React.FC = () => {
                         >
                           {badge.label}
                         </span>
-                        <span className="text-sm font-semibold text-white bg-white/10 px-3 py-1 rounded-lg">
-                          {appointment.formattedTime}
-                        </span>
+                        <div className="text-right">
+                          <span className="text-sm font-semibold text-white bg-white/10 px-3 py-1 rounded-lg">
+                            {appointment.formattedTime}
+                          </span>
+                          {appointment.duration && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              {appointment.duration}min
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-end gap-3 mt-3">
-                      <button
-                        onClick={event => {
-                          event.stopPropagation()
-                          handleStartAppointment(appointment)
-                        }}
-                        className="text-xs text-slate-300 hover:text-white transition-colors"
-                      >
-                        Selecionar
-                      </button>
-                      <button
-                        onClick={event => {
-                          event.stopPropagation()
-                          handleStartAppointment(appointment, { navigateToChat: true })
-                        }}
-                        className="bg-gradient-to-r from-[#00C16A] to-[#00F5A0] text-slate-900 px-3 py-2 rounded-lg text-xs font-semibold"
-                      >
-                        Iniciar atendimento
-                      </button>
+                    <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-600/30">
+                      <div className="flex items-center gap-2">
+                        {appointment.is_remote && (
+                          <div className="flex items-center gap-1 text-xs text-blue-400">
+                            <Video className="w-3 h-3" />
+                            <span>Online</span>
+                          </div>
+                        )}
+                        {appointment.meeting_url && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              window.open(appointment.meeting_url!, '_blank')
+                            }}
+                            className="text-xs text-[#00F5A0] hover:text-white transition-colors"
+                          >
+                            Link da reunião
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={event => {
+                            event.stopPropagation()
+                            handleStartAppointment(appointment)
+                          }}
+                          className="text-xs text-slate-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
+                        >
+                          Selecionar
+                        </button>
+                        <button
+                          onClick={event => {
+                            event.stopPropagation()
+                            handleStartAppointment(appointment, { navigateToChat: true })
+                          }}
+                          className="bg-gradient-to-r from-[#00C16A] to-[#00F5A0] text-slate-900 px-3 py-2 rounded-lg text-xs font-semibold hover:shadow-lg transition-all"
+                        >
+                          <Video className="w-3 h-3 inline mr-1" />
+                          Iniciar atendimento
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -3449,18 +3582,49 @@ const RicardoValencaDashboard: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-3">
                     <button
                       onClick={() => handleStartAppointment(selectedAppointment, { navigateToChat: true })}
-                      className="bg-gradient-to-r from-[#00C16A] to-[#00F5A0] text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold"
+                      className="bg-gradient-to-r from-[#00C16A] to-[#00F5A0] text-slate-900 px-4 py-2 rounded-lg text-sm font-semibold hover:shadow-lg transition-all"
                     >
+                      <MessageCircle className="w-4 h-4 inline mr-2" />
                       Abrir chat clínico
                     </button>
                     {selectedAppointment.meeting_url && (
                       <button
                         onClick={() => window.open(selectedAppointment.meeting_url as string, '_blank', 'noopener,noreferrer')}
-                        className="bg-slate-800 border border-slate-600 hover:border-[#00F5A0]/40 text-white px-4 py-2 rounded-lg text-sm"
+                        className="bg-slate-800 border border-slate-600 hover:border-[#00F5A0]/40 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition-colors"
                       >
+                        <Video className="w-4 h-4 inline mr-2" />
                         Abrir link da consulta
                       </button>
                     )}
+                    <button
+                      onClick={() => {
+                        if (selectedAppointment.patient_id) {
+                          navigate(`/app/clinica/profissional/pacientes?patientId=${selectedAppointment.patient_id}`)
+                        }
+                      }}
+                      className="bg-slate-800 border border-slate-600 hover:border-blue-500/40 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition-colors"
+                    >
+                      <User className="w-4 h-4 inline mr-2" />
+                      Ver prontuário
+                    </button>
+                  </div>
+
+                  {/* Lembretes importantes */}
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-amber-200">
+                        <p className="font-semibold mb-1">Lembretes para o atendimento:</p>
+                        <ul className="space-y-1 text-amber-300/80">
+                          <li>• A IA residente registrará automaticamente as notas da consulta</li>
+                          <li>• Relatório clínico será gerado ao final do atendimento</li>
+                          <li>• Verifique alergias e medicações atuais do paciente</li>
+                          {selectedAppointment.is_remote && (
+                            <li>• Confirme conexão de vídeo antes de iniciar</li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
