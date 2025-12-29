@@ -982,6 +982,8 @@ const RicardoValencaDashboard: React.FC = () => {
     loadKPIs()
     loadDoctorDashboardStats()
     loadAppointments()
+  }, [user?.id, loadPatients, loadKPIs, loadDoctorDashboardStats, loadAppointments])
+
   // Verificar agendamentos próximos e mostrar notificações
   useEffect(() => {
     const checkUpcomingAppointments = () => {
