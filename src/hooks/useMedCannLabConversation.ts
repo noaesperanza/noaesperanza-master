@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { NoaResidentAI, type AIResponse } from '../lib/noaResidentAI'
 import { ConversationalIntent } from '../lib/medcannlab/types'
+import { noaVoiceConfig, getBestVoiceForNoa } from '../lib/noaVoiceConfig'
 
 const sanitizeForSpeech = (text: string): string => {
   return text
@@ -507,23 +508,20 @@ export const useMedCannLabConversation = () => {
     }
     revealStep()
 
-    // Speech Synthesis
+    // Speech Synthesis - Configuração otimizada para voz feminina da Nôa Esperança
     const utterance = new SpeechSynthesisUtterance(sanitized.length > 0 ? sanitized : fullContent)
-    utterance.lang = 'pt-BR'
-    utterance.rate = 1.15
-    utterance.volume = 0.93
+    utterance.lang = noaVoiceConfig.lang
+    utterance.rate = noaVoiceConfig.rate
+    utterance.volume = noaVoiceConfig.volume
+    utterance.pitch = noaVoiceConfig.pitch
 
-    const voices = voicesRef.current
-    if (voices && voices.length > 0) {
-      const preferred = voices.filter(v => v.lang?.toLowerCase() === 'pt-br')
-      const contralto = preferred.find(v => /contralto|grave|baixa|low|alto/i.test(v.name))
-      const victoria = preferred.find(v => /vit[oó]ria/i.test(v.name))
-      const nonSoprano = preferred.filter(v => !/soprano|aguda|high|tenor/i.test(v.name))
-      const selectedVoice = contralto || victoria || nonSoprano.find(v => /bia|camila|carol|helo[ií]sa/i.test(v.name)) || nonSoprano[0] || preferred[0] || voices[0]
-      if (selectedVoice) {
-        utterance.voice = selectedVoice
-        utterance.pitch = contralto ? 0.65 : victoria ? 0.75 : 0.78
-      }
+    // Selecionar a melhor voz feminina para Nôa
+    const selectedVoice = getBestVoiceForNoa(voicesRef.current)
+    if (selectedVoice) {
+      utterance.voice = selectedVoice
+      console.log(`🎤 Nôa usando voz: ${selectedVoice.name} (${selectedVoice.lang})`)
+    } else {
+      console.warn('⚠️ Nenhuma voz adequada encontrada para Nôa, usando voz padrão')
     }
 
     utterance.onstart = () => {
