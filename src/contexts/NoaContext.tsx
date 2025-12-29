@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef, useCallback } from 'react'
 import { NoaEsperancaCore, noaEsperancaConfig, NoaInteraction } from '../lib/noaEsperancaCore'
 import { NoaResidentAI, residentAIConfig, AIResponse } from '../lib/noaResidentAI'
 import { useAuth } from './AuthContext'
@@ -16,13 +16,20 @@ export interface NoaMessage {
   suggestions?: string[]
 }
 
+interface RecognitionHandle {
+  recognition: any
+  buffer: string
+  timer?: number
+  stopped?: boolean
+}
+
 export interface NoaContextType {
   messages: NoaMessage[]
   isOpen: boolean
   isTyping: boolean
   isListening: boolean
   isSpeaking: boolean
-  sendMessage: (content: string) => void
+  sendMessage: (content: string, options?: { preferVoice?: boolean }) => void
   toggleChat: () => void
   startListening: () => void
   stopListening: () => void
@@ -59,6 +66,7 @@ export const NoaProvider: React.FC<NoaProviderProps> = ({ children }) => {
   
   // Inicializar IA Residente apenas quando houver usuário logado
   const residentAIRef = useRef<NoaResidentAI | null>(null)
+  const recognitionRef = useRef<RecognitionHandle | null>(null)
   
   useEffect(() => {
     if (user && !residentAIRef.current) {
@@ -69,7 +77,29 @@ export const NoaProvider: React.FC<NoaProviderProps> = ({ children }) => {
     }
   }, [user])
 
-  const sendMessage = async (content: string) => {
+  // Cleanup do reconhecimento de voz
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stopped = true
+        if (recognitionRef.current.timer) {
+          window.clearTimeout(recognitionRef.current.timer)
+          recognitionRef.current.timer = undefined
+        }
+        recognitionRef.current.recognition.onresult = null
+        recognitionRef.current.recognition.onerror = null
+        recognitionRef.current.recognition.onend = null
+        recognitionRef.current.recognition.stop()
+        const text = recognitionRef.current.buffer.trim()
+        if (text.length > 0) {
+          sendMessage(text, { preferVoice: true })
+        }
+        recognitionRef.current = null
+      }
+    }
+  }, [])
+
+  const sendMessage = async (content: string, options?: { preferVoice?: boolean }) => {
     // Verificar se há usuário logado e IA inicializada
     if (!user) {
       const errorMessage: NoaMessage = {
@@ -146,14 +176,99 @@ export const NoaProvider: React.FC<NoaProviderProps> = ({ children }) => {
     setIsOpen(prev => !prev)
   }
 
-  const startListening = () => {
-    setIsListening(true)
-    // Implementar reconhecimento de voz
-  }
-
-  const stopListening = () => {
+  const stopListening = useCallback(() => {
+    const handle = recognitionRef.current
+    if (handle) {
+      handle.stopped = true
+      if (handle.timer) {
+        window.clearTimeout(handle.timer)
+        handle.timer = undefined
+      }
+      handle.recognition.onresult = null
+      handle.recognition.onerror = null
+      handle.recognition.onend = null
+      handle.recognition.stop()
+      const text = handle.buffer.trim()
+      if (text.length > 0) {
+        sendMessage(text, { preferVoice: true })
+      }
+      recognitionRef.current = null
+    }
     setIsListening(false)
-  }
+  }, [])
+
+  const startListening = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.warn('Reconhecimento de voz não suportado neste navegador.')
+      return
+    }
+
+    window.dispatchEvent(new Event('noaStopSpeech'))
+    stopListening()
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition: any = new SpeechRecognition()
+    recognition.lang = 'pt-BR'
+    recognition.continuous = true
+    recognition.interimResults = true
+
+    const handle: RecognitionHandle = {
+      recognition,
+      buffer: ''
+    }
+    recognitionRef.current = handle
+
+    const flush = () => {
+      const text = handle.buffer.trim()
+      if (text.length > 0) {
+        sendMessage(text, { preferVoice: true })
+        handle.buffer = ''
+      }
+    }
+
+    const scheduleFlush = () => {
+      if (handle.timer) {
+        window.clearTimeout(handle.timer)
+      }
+      handle.timer = window.setTimeout(() => {
+        flush()
+      }, 900)
+    }
+
+    recognition.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          handle.buffer += `${result[0].transcript.trim()} `
+          scheduleFlush()
+        }
+      }
+    }
+
+    recognition.onerror = (event: any) => {
+      console.error('Erro no reconhecimento de voz:', event.error)
+      if (handle.timer) {
+        window.clearTimeout(handle.timer)
+        handle.timer = undefined
+      }
+      flush()
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    recognition.onend = () => {
+      if (handle.timer) {
+        window.clearTimeout(handle.timer)
+        handle.timer = undefined
+      }
+      flush()
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    recognition.start()
+    setIsListening(true)
+  }, [stopListening])
 
   const clearMessages = () => {
     setMessages([])

@@ -44,6 +44,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { getAllPatients, isAdmin } from '../lib/adminPermissions'
 import { KnowledgeBaseIntegration, KnowledgeDocument, KnowledgeStats } from '../services/knowledgeBaseIntegration'
+import NoaEsperancaAvatar from '../components/NoaEsperancaAvatar'
 import {
   backgroundGradient,
   surfaceStyle,
@@ -5174,6 +5175,9 @@ const RicardoValencaDashboard: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Nôa Esperança - IA Residente */}
+      <NoaEsperancaAvatar />
     </div>
   )
 }

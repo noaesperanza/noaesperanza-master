@@ -1,9 +1,9 @@
+/* Importar CSS responsivo mobile-first */
+@import './styles/mobile-responsive.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Importar CSS responsivo mobile-first */
-@import '../styles/mobile-responsive.css';
 
 @layer base {
   * {

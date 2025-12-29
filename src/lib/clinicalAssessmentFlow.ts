@@ -392,7 +392,7 @@ export class ClinicalAssessmentFlow {
       }
     } else {
       const field = currentQ.field as keyof AssessmentData
-      state.data[field] = userResponse.trim() as any
+      ;(state.data as any)[field] = userResponse.trim()
       state.currentQuestionIndex++
       state.lastUpdate = new Date()
       
@@ -447,7 +447,7 @@ export class ClinicalAssessmentFlow {
     
     // Salvar resposta
     const field = currentQ.field as keyof AssessmentData
-    state.data[field] = userResponse.trim() as any
+    ;(state.data as any)[field] = userResponse.trim()
     state.currentQuestionIndex++
     state.lastUpdate = new Date()
     

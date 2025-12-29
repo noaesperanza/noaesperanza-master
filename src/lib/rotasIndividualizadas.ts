@@ -59,6 +59,14 @@ export const ROTAS_INDIVIDUALIZADAS: Record<string, UserRoute> = {
         title: 'Relatórios Clínicos',
         description: 'Visualizar relatórios gerados pela IA',
         icon: '📊'
+      },
+      {
+        path: '/app/clinica/profissional/kpis',
+        component: () => import('../pages/KPIDashboard').then(m => m.default),
+        requiredRole: 'professional',
+        title: 'Dashboard de KPIs',
+        description: 'Monitoramento das 3 camadas IMRE',
+        icon: '📈'
       }
     ]
   },

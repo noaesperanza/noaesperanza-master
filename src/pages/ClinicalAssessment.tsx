@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -13,123 +13,118 @@ import {
   Activity,
   Download,
   Share2,
-  Loader2
+  Loader2,
+  MessageCircle,
+  Mic,
+  MicOff
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { NoaResidentAI } from '../lib/noaResidentAI'
+import { clinicalAssessmentFlow, AssessmentPhase } from '../lib/clinicalAssessmentFlow'
 import ShareAssessment from '../components/ShareAssessment'
 
 const ClinicalAssessment: React.FC = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentQuestion, setCurrentQuestion] = useState('')
+  const [userResponse, setUserResponse] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [assessmentPhase, setAssessmentPhase] = useState<AssessmentPhase>('INITIAL_GREETING')
+  const [isComplete, setIsComplete] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   const [reportGenerated, setReportGenerated] = useState(false)
   const [nftMinted, setNftMinted] = useState(false)
   const [savedToRecords, setSavedToRecords] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [transcript, setTranscript] = useState('')
 
-  const imreBlocks = [
-    {
-      id: 'indiciaria',
-      title: 'Lista Indiciária',
-      description: 'Identificação inicial dos sintomas e queixas',
-      icon: <FileText className="w-6 h-6" />,
-      color: 'blue',
-      steps: 4,
-      completed: false
-    },
-    {
-      id: 'queixa',
-      title: 'Desenvolvimento da Queixa',
-      description: 'Anamnese detalhada e história da doença atual',
-      icon: <User className="w-6 h-6" />,
-      color: 'green',
-      steps: 6,
-      completed: false
-    },
-    {
-      id: 'patologica',
-      title: 'História Patológica',
-      description: 'Antecedentes médicos e cirúrgicos',
-      icon: <Heart className="w-6 h-6" />,
-      color: 'red',
-      steps: 2,
-      completed: false
-    },
-    {
-      id: 'familiar',
-      title: 'História Familiar',
-      description: 'Antecedentes familiares e hereditários',
-      icon: <Brain className="w-6 h-6" />,
-      color: 'purple',
-      steps: 4,
-      completed: false
-    },
-    {
-      id: 'habitos',
-      title: 'Hábitos de Vida',
-      description: 'Alimentação, exercícios e estilo de vida',
-      icon: <Activity className="w-6 h-6" />,
-      color: 'orange',
-      steps: 2,
-      completed: false
-    },
-    {
-      id: 'medicacoes',
-      title: 'Medicações',
-      description: 'Uso atual e histórico de medicamentos',
-      icon: <Stethoscope className="w-6 h-6" />,
-      color: 'indigo',
-      steps: 4,
-      completed: false
-    },
-    {
-      id: 'alergias',
-      title: 'Alergias',
-      description: 'Reações alérgicas e intolerâncias',
-      icon: <AlertCircle className="w-6 h-6" />,
-      color: 'yellow',
-      steps: 2,
-      completed: false
-    },
-    {
-      id: 'fechamento',
-      title: 'Fechamento Consensual',
-      description: 'Síntese e validação das informações',
-      icon: <CheckCircle className="w-6 h-6" />,
-      color: 'emerald',
-      steps: 1,
-      completed: false
+  // Estado da avaliação usando o ClinicalAssessmentFlow
+  const [assessmentState, setAssessmentState] = useState(() => {
+    if (user?.id) {
+      return clinicalAssessmentFlow.startAssessment(user.id)
     }
-  ]
+    return null
+  })
 
-  const getColorClasses = (color: string) => {
-    const colors = {
-      blue: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200',
-      green: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200',
-      red: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-200',
-      purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-200',
-      orange: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-200',
-      indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-200',
-      yellow: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200',
-      emerald: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200'
+  useEffect(() => {
+    if (user?.id && !assessmentState) {
+      const state = clinicalAssessmentFlow.startAssessment(user.id)
+      setAssessmentState(state)
+      setCurrentQuestion('Olá! Sou a Nôa Esperança, IA residente treinada para escuta. Vamos iniciar sua Avaliação Clínica Inicial seguindo o protocolo IMRE. Como você gostaria de se apresentar?')
+      setAssessmentPhase('INITIAL_GREETING')
     }
-    return colors[color as keyof typeof colors] || colors.blue
+  }, [user?.id, assessmentState])
+
+  // Reconhecimento de voz
+  useEffect(() => {
+    let recognition: any = null
+
+    if (isListening && 'webkitSpeechRecognition' in window) {
+      recognition = new (window as any).webkitSpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = false
+      recognition.lang = 'pt-BR'
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript
+        setTranscript(transcript)
+        setUserResponse(transcript)
+      }
+
+      recognition.onend = () => {
+        setIsListening(false)
+      }
+
+      recognition.start()
+    }
+
+    return () => {
+      if (recognition) {
+        recognition.stop()
+      }
+    }
+  }, [isListening])
+
+  const toggleListening = () => {
+    setIsListening(!isListening)
+    if (isListening) {
+      setTranscript('')
+    }
   }
 
-  const getIconColor = (color: string) => {
-    const colors = {
-      blue: 'text-blue-600',
-      green: 'text-green-600',
-      red: 'text-red-600',
-      purple: 'text-purple-600',
-      orange: 'text-orange-600',
-      indigo: 'text-indigo-600',
-      yellow: 'text-yellow-600',
-      emerald: 'text-emerald-600'
+  const handleSendResponse = async () => {
+    if (!user?.id || !userResponse.trim() || isProcessing) return
+
+    setIsProcessing(true)
+
+    try {
+      // Processar resposta usando o ClinicalAssessmentFlow
+      const result = clinicalAssessmentFlow.processResponse(user.id, userResponse)
+
+      setAssessmentPhase(result.phase)
+      setCurrentQuestion(result.nextQuestion)
+      setUserResponse('')
+      setTranscript('')
+
+      if (result.isComplete) {
+        setIsComplete(true)
+        // Iniciar processo de geração de relatório
+        await handleCompleteAssessment()
+      }
+    } catch (error) {
+      console.error('Erro ao processar resposta:', error)
+      setCurrentQuestion('Desculpe, houve um erro. Vamos tentar novamente. ' + currentQuestion)
+    } finally {
+      setIsProcessing(false)
     }
-    return colors[color as keyof typeof colors] || colors.blue
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      handleSendResponse()
+    }
   }
 
   const handleCompleteAssessment = async () => {
@@ -145,6 +140,13 @@ const ClinicalAssessment: React.FC = () => {
 
       // Instanciar a IA Residente
       const noaAI = new NoaResidentAI()
+
+      // Obter dados da avaliação usando o ClinicalAssessmentFlow
+      const assessmentData = clinicalAssessmentFlow.getAssessmentData(user.id)
+
+      if (!assessmentData) {
+        throw new Error('Dados da avaliação não encontrados')
+      }
 
       // Gerar resumo baseado nos dados reais da avaliação
       let dynamicSummary = await noaAI.generateClinicalSummary(user.id)
@@ -263,282 +265,210 @@ const ClinicalAssessment: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white dark:text-white mb-2">
-            Avaliação Clínica IMRE Triaxial
+        <div className="mb-8 text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-sky-500 rounded-full flex items-center justify-center">
+              <Stethoscope className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">
+            Avaliação Clínica Inicial
           </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Sistema completo de avaliação clínica com 28 blocos especializados
+          <p className="text-gray-300 max-w-2xl mx-auto">
+            Sou a Nôa Esperança, IA residente treinada para escuta. Vamos realizar sua avaliação clínica inicial seguindo o protocolo IMRE da Arte da Entrevista Clínica.
           </p>
         </div>
 
-        {/* Progress Overview */}
-        <div className="card p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white dark:text-white">
-              Progresso da Avaliação
-            </h2>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              0 de 28 blocos concluídos
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
-            <div className="bg-primary-600 h-3 rounded-full transition-all duration-300" style={{ width: '0%' }} />
-          </div>
-        </div>
-
-        {/* IMRE Blocks Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {imreBlocks.map((block, index) => (
-            <div
-              key={block.id}
-              className="card card-hover p-6 cursor-pointer"
-              onClick={() => setCurrentStep(index)}
-            >
-              <div className="flex items-start space-x-4">
-                <div className={`p-3 rounded-lg ${getColorClasses(block.color)}`}>
-                  <div className={getIconColor(block.color)}>
-                    {block.icon}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-white dark:text-white">
-                      {block.title}
-                    </h3>
-                    {block.completed ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <Clock className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">
-                    {block.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {block.steps} etapas
-                    </span>
-                    <button className="text-primary-600 hover:text-primary-500 text-sm font-medium">
-                      {block.completed ? 'Revisar' : 'Iniciar'}
-                    </button>
-                  </div>
+        {/* Chat Interface */}
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-2xl border border-slate-700 overflow-hidden">
+            {/* Chat Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-sky-500 px-6 py-4">
+              <div className="flex items-center space-x-3">
+                <MessageCircle className="w-6 h-6 text-white" />
+                <h2 className="text-lg font-semibold text-white">
+                  Conversa com Nôa Esperança
+                </h2>
+                <div className="ml-auto flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${isComplete ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`} />
+                  <span className="text-sm text-white">
+                    {isComplete ? 'Concluída' : 'Em andamento'}
+                  </span>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Assessment Form */}
-        {currentStep !== null && (
-          <div className="mt-8">
-            <div className="card p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-white dark:text-white">
-                  {imreBlocks[currentStep]?.title}
-                </h2>
+            {/* Chat Messages */}
+            <div className="h-96 overflow-y-auto p-6 space-y-4">
+              {currentQuestion && (
+                <div className="flex justify-start">
+                  <div className="max-w-[80%] bg-slate-700 text-white px-4 py-3 rounded-2xl rounded-tl-md">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="w-8 h-8 bg-gradient-to-r from-emerald-500 to-sky-500 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">N</span>
+                      </div>
+                      <span className="text-sm font-medium text-emerald-300">Nôa Esperança</span>
+                    </div>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{currentQuestion}</p>
+                  </div>
+                </div>
+              )}
+
+              {isProcessing && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-700 text-white px-4 py-3 rounded-2xl rounded-tl-md">
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Elaborando próxima pergunta...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Area */}
+            {!isComplete && (
+              <div className="border-t border-slate-700 p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={userResponse}
+                      onChange={(e) => setUserResponse(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder={isListening ? `🎤 Ouvindo... ${transcript}` : "Digite sua resposta aqui..."}
+                      disabled={isProcessing}
+                      className="w-full bg-slate-700 border border-slate-600 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50"
+                    />
+                  </div>
+
+                  <button
+                    onClick={toggleListening}
+                    disabled={isProcessing}
+                    className={`p-3 rounded-lg transition-colors ${
+                      isListening
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-slate-600 hover:bg-slate-500 text-white'
+                    } disabled:opacity-50`}
+                    title={isListening ? 'Parar gravação' : 'Iniciar gravação de voz'}
+                  >
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
+
+                  <button
+                    onClick={handleSendResponse}
+                    disabled={!userResponse.trim() || isProcessing}
+                    className="bg-gradient-to-r from-emerald-600 to-sky-500 hover:from-emerald-700 hover:to-sky-600 text-white px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {isProcessing ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <MessageCircle className="w-5 h-5" />
+                    )}
+                    <span>Enviar</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Completion Section */}
+          {isComplete && (
+            <div className="mt-8 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg p-6 text-white">
+              <div className="text-center mb-6">
+                <CheckCircle className="w-16 h-16 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Avaliação Clínica Concluída!</h2>
+                <p className="text-green-100">
+                  Agora vamos gerar seu relatório clínico completo e registrá-lo na blockchain.
+                </p>
+              </div>
+
+              {/* Status do Processo */}
+              <div className="mb-6 space-y-3">
+                <div className={`flex items-center space-x-3 p-3 rounded-lg ${reportGenerated ? 'bg-green-500/30' : 'bg-white/10'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${reportGenerated ? 'bg-green-500' : 'bg-white/30'}`}>
+                    {reportGenerated ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">1</span>}
+                  </div>
+                  <span className="text-sm">Relatório Clínico Gerado</span>
+                </div>
+
+                <div className={`flex items-center space-x-3 p-3 rounded-lg ${nftMinted ? 'bg-green-500/30' : 'bg-white/10'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${nftMinted ? 'bg-green-500' : 'bg-white/30'}`}>
+                    {nftMinted ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">2</span>}
+                  </div>
+                  <span className="text-sm">NFT Registrado na Blockchain</span>
+                </div>
+
+                <div className={`flex items-center space-x-3 p-3 rounded-lg ${savedToRecords ? 'bg-green-500/30' : 'bg-white/10'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${savedToRecords ? 'bg-green-500' : 'bg-white/30'}`}>
+                    {savedToRecords ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">3</span>}
+                  </div>
+                  <span className="text-sm">Salvo nos Prontuários</span>
+                </div>
+              </div>
+
+              {/* Botão Principal */}
+              <div className="text-center">
                 <button
-                  onClick={() => setCurrentStep(0)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  onClick={handleCompleteAssessment}
+                  disabled={isGeneratingReport}
+                  className="bg-white/20 hover:bg-white/30 disabled:bg-white/10 text-white py-4 px-8 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-3 mx-auto text-lg font-semibold"
                 >
-                  ✕
+                  {isGeneratingReport ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span>Processando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Stethoscope className="w-6 h-6" />
+                      <span>Finalizar e Gerar Relatório</span>
+                    </>
+                  )}
                 </button>
               </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Queixa Principal
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-slate-100/50 dark:bg-slate-800/80 text-white dark:text-white"
-                    rows={3}
-                    placeholder="Descreva a queixa principal do paciente..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    História da Doença Atual
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-slate-100/50 dark:bg-slate-800/80 text-white dark:text-white"
-                    rows={4}
-                    placeholder="Descreva detalhadamente a evolução dos sintomas..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Início dos Sintomas
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-slate-100/50 dark:bg-slate-800/80 text-white dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Intensidade (1-10)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-slate-100/50 dark:bg-slate-800/80 text-white dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end space-x-4">
-                  <button className="btn-secondary">
-                    Salvar Rascunho
+              {/* Botões Secundários */}
+              {savedToRecords && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+                  >
+                    <Activity className="w-5 h-5" />
+                    <span>Compartilhar</span>
                   </button>
-                  <button className="btn-primary">
-                    Próxima Etapa
+
+                  <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
+                    <Download className="w-5 h-5" />
+                    <span>Baixar PDF</span>
+                  </button>
+
+                  <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
+                    <Share2 className="w-5 h-5" />
+                    <span>Enviar Email</span>
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="card p-6 text-center">
-            <Stethoscope className="w-12 h-12 text-primary-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white dark:text-white mb-2">
-              Nova Avaliação
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-              Inicie uma nova avaliação clínica completa
-            </p>
-            <button className="btn-primary w-full">
-              Começar
-            </button>
-          </div>
-
-          <div className="card p-6 text-center">
-            <FileText className="w-12 h-12 text-green-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white dark:text-white mb-2">
-              Relatórios
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-              Visualize e exporte relatórios gerados
-            </p>
-            <button className="btn-secondary w-full">
-              Ver Relatórios
-            </button>
-          </div>
-
-          <div className="card p-6 text-center">
-            <Brain className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white dark:text-white mb-2">
-              IA Assistente
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
-              Conte com a Nôa para auxiliar na avaliação
-            </p>
-            <button className="btn-secondary w-full">
-              Ativar IA
-            </button>
-          </div>
-        </div>
-
-        {/* Seção de Conclusão e Processo Completo */}
-        <div className="mt-8 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg p-6 text-white">
-          <div className="text-center mb-6">
-            <CheckCircle className="w-16 h-16 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Finalizar Avaliação Clínica</h2>
-            <p className="text-green-100">
-              Complete o processo completo: Relatório → NFT → Prontuários
-            </p>
-          </div>
-
-          {/* Status do Processo */}
-          <div className="mb-6 space-y-3">
-            <div className={`flex items-center space-x-3 p-3 rounded-lg ${reportGenerated ? 'bg-green-500/30' : 'bg-white/10'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${reportGenerated ? 'bg-green-500' : 'bg-white/30'}`}>
-                {reportGenerated ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">1</span>}
-              </div>
-              <span className="text-sm">Relatório Clínico Gerado</span>
-            </div>
-
-            <div className={`flex items-center space-x-3 p-3 rounded-lg ${nftMinted ? 'bg-green-500/30' : 'bg-white/10'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${nftMinted ? 'bg-green-500' : 'bg-white/30'}`}>
-                {nftMinted ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">2</span>}
-              </div>
-              <span className="text-sm">NFT Registrado</span>
-            </div>
-
-            <div className={`flex items-center space-x-3 p-3 rounded-lg ${savedToRecords ? 'bg-green-500/30' : 'bg-white/10'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${savedToRecords ? 'bg-green-500' : 'bg-white/30'}`}>
-                {savedToRecords ? <CheckCircle className="w-4 h-4 text-white" /> : <span className="text-xs">3</span>}
-              </div>
-              <span className="text-sm">Salvo nos Prontuários</span>
-            </div>
-          </div>
-
-          {/* Botão Principal */}
-          <div className="text-center">
-            <button
-              onClick={handleCompleteAssessment}
-              disabled={isGeneratingReport}
-              className="bg-white/20 hover:bg-white/30 disabled:bg-white/10 text-white py-4 px-8 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-3 mx-auto text-lg font-semibold"
-            >
-              {isGeneratingReport ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  <span>Processando...</span>
-                </>
-              ) : (
-                <>
-                  <Stethoscope className="w-6 h-6" />
-                  <span>Finalizar Avaliação Completa</span>
-                </>
               )}
-            </button>
-          </div>
-
-          {/* Botões Secundários */}
-          {savedToRecords && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
-              >
-                <Activity className="w-5 h-5" />
-                <span>Compartilhar</span>
-              </button>
-
-              <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
-                <Download className="w-5 h-5" />
-                <span>Baixar PDF</span>
-              </button>
-
-              <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2">
-                <Share2 className="w-5 h-5" />
-                <span>Enviar Email</span>
-              </button>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Modal de Compartilhamento */}
-      {showShareModal && (
-        <ShareAssessment
-          assessmentId="assessment-123"
-          patientName="Paciente"
-          onClose={() => setShowShareModal(false)}
-        />
-      )}
+        {/* Modal de Compartilhamento */}
+        {showShareModal && (
+          <ShareAssessment
+            assessmentId="assessment-123"
+            patientName={user?.user_metadata?.name || "Paciente"}
+            onClose={() => setShowShareModal(false)}
+          />
+        )}
+      </div>
     </div>
   )
 }
 
 export default ClinicalAssessment
+
