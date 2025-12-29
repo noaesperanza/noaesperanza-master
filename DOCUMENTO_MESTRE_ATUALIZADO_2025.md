@@ -41,6 +41,13 @@
 }
 ```
 
+### 1.3 Sistema de Avaliação Clínica com IA
+- **IA Residente Realiza Avaliações**: A Nôa Esperança CONDUZ avaliações clínicas completas usando o protocolo IMRE
+- **ClinicalAssessmentFlow**: Sistema implementado em `src/lib/clinicalAssessmentFlow.ts`
+- **Suspensão do Decoder**: Durante avaliações, a IA não dá devolutivas intermediárias
+- **Relatórios Automáticos**: Geração de relatórios clínicos ao final da avaliação
+- **Integração com Base de Conhecimento**: Resultados conectados à biblioteca médica
+
 ---
 
 ## 2. FUNCIONALIDADES IMPLEMENTADAS
