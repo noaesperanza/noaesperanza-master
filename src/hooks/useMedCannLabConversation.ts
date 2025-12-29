@@ -520,8 +520,22 @@ export const useMedCannLabConversation = () => {
     if (selectedVoice) {
       utterance.voice = selectedVoice
       console.log(`🎤 Nôa usando voz: ${selectedVoice.name} (${selectedVoice.lang})`)
+
+      // Forçar parâmetros femininos mesmo com voz selecionada
+      // Ajustar pitch se a voz parecer masculina
+      if (selectedVoice.name.toLowerCase().includes('male') ||
+          selectedVoice.name.toLowerCase().includes('masculino') ||
+          selectedVoice.name.toLowerCase().includes('homem') ||
+          selectedVoice.name.toLowerCase().includes('man')) {
+        utterance.pitch = Math.max(noaVoiceConfig.pitch * 1.3, 1.5) // Pitch mais alto para compensar
+        utterance.rate = Math.min(noaVoiceConfig.rate * 0.9, 0.8) // Rate mais lento
+        console.log('⚡ Ajustando parâmetros para compensar voz masculina detectada')
+      }
     } else {
-      console.warn('⚠️ Nenhuma voz adequada encontrada para Nôa, usando voz padrão')
+      console.warn('⚠️ Nenhuma voz adequada encontrada para Nôa, usando voz padrão do navegador')
+      // Mesmo sem voz específica, manter parâmetros femininos
+      utterance.pitch = noaVoiceConfig.pitch
+      utterance.rate = noaVoiceConfig.rate
     }
 
     utterance.onstart = () => {
